@@ -183,7 +183,7 @@ def monte_carlo_simulation(num_users, iterations, monte_carlo_runs, probability)
 # Streamlit app
 st.title("Monte Carlo Simulation for $HEALTH")
 
-num_users = st.slider("Number of Users", 100, 1000, 500)
+num_users = st.slider("Number of Users", 5, 1000, 500)
 iterations = st.slider("Iterations per Run", 10, 100, 50)
 monte_carlo_runs = st.slider("Monte Carlo Runs", 10, 100, 50)
 probability = st.slider("Activity Pool Probability", 0.0, 1.0, 0.2)
