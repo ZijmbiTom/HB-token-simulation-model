@@ -1,7 +1,7 @@
+# test_app.py
 import streamlit as st
 
-st.title("Welkom bij Streamlit!")
-st.write("Dit is een eenvoudige test om te controleren of Streamlit werkt.")
+st.title('My Test App')
+st.write('Hello, Streamlit!')
 
-slider_value = st.slider("Verplaats de schuifregelaar:", 0, 100, 50)
-st.write(f"De waarde van de schuifregelaar is: {slider_value}")
+# Save this file in your repository
