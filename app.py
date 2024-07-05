@@ -188,7 +188,7 @@ st.title("Monte Carlo Simulation for $HEALTH")
 num_users = st.slider("Number of Users", 5, 1000, 500)
 iterations = st.slider("Iterations per Run", 10, 100, 50)
 monte_carlo_runs = st.slider("Monte Carlo Runs", 10, 100, 50)
-probability = st.slider("Activity Pool Probability", 0.0, 1.0, 0.2)
+probability = st.slider("Activity Pool Probability", 0.0, 1.0, 0.9)
 
 if st.button("Run Simulation"):
     with st.spinner("Running simulation..."):
@@ -203,13 +203,14 @@ if st.button("Run Simulation"):
 
     # Plot the market prices
     fig, ax = plt.subplots()
-    for market_prices in all_market_prices:
-        ax.plot(market_prices, label='Market Price')
+    for i, market_prices in enumerate(all_market_prices):
+        ax.plot(market_prices, label=f'Run {i+1}')
     
     ax.set_xlabel('Iteration')
     ax.set_ylabel('Market Price')
     ax.set_title('Market Price over Iterations')
     ax.set_ylim(bottom=1)  # Ensure y-axis starts at 1 or higher
+    ax.legend()  # Add legend
     st.pyplot(fig)
 
     # Display sample results
