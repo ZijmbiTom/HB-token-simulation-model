@@ -150,18 +150,25 @@ def simulate_market(activity_pool, iterations):
 
 def monte_carlo_simulation(num_users, iterations, monte_carlo_runs, probability):
     results = []
-    users = [User(f"user{i+1}") for i in range(num_users)]
-    token_generator = TokenGenerator()
-    market = Market(users)
-    initial_release = InitialRelease(users, token_generator)
-    initial_release.distribute_tokens(10)
-    activity_pool = ActivityPool(users, token_generator, market, probability=probability)
-
-    market_prices = []
+    all_market_prices = []
 
     for _ in range(monte_carlo_runs):
-        simulate_market(activity_pool, iterations)
-        market_prices.append(market.price)
+        users = [User(f"user{i+1}") for i in range(num_users)]
+        token_generator = TokenGenerator()
+        market = Market(users)
+        initial_release = InitialRelease(users, token_generator)
+        initial_release.distribute_tokens(10)
+        activity_pool = ActivityPool(users, token_generator, market, probability=probability)
+
+        market_prices = []
+
+        for _ in range(iterations):
+            for user in activity_pool.users:
+                activity_pool.participate(user)
+            activity_pool.market.trade_tokens()
+            market_prices.append(market.price)
+
+        all_market_prices.append(market_prices)
         for user in users:
             results.append({
                 "user_name": user.name,
@@ -171,10 +178,10 @@ def monte_carlo_simulation(num_users, iterations, monte_carlo_runs, probability)
                 "final_utility": user.activity_utility()
             })
 
-    return results, market_prices
+    return results, all_market_prices
 
 # Streamlit app
-st.title("Monte Carlo Simulation for Token Market")
+st.title("Monte Carlo Simulation for $HEALTH")
 
 num_users = st.slider("Number of Users", 100, 1000, 500)
 iterations = st.slider("Iterations per Run", 10, 100, 50)
@@ -183,14 +190,27 @@ probability = st.slider("Activity Pool Probability", 0.0, 1.0, 0.2)
 
 if st.button("Run Simulation"):
     with st.spinner("Running simulation..."):
-        results, market_prices = monte_carlo_simulation(num_users, iterations, monte_carlo_runs, probability)
+        results, all_market_prices = monte_carlo_simulation(num_users, iterations, monte_carlo_runs, probability)
 
     st.success("Simulation completed!")
-    st.write(f"Average final utility after Monte Carlo simulation: {np.mean([result['final_utility'] for result in results]):.2f}")
 
-    market_price_df = pd.DataFrame(market_prices, columns=["Market Price"])
-    st.line_chart(market_price_df)
+    # Calculate average market price
+    avg_market_prices = [np.mean(prices) for prices in all_market_prices]
+    overall_avg_market_price = np.mean(avg_market_prices)
+    st.write(f"Average market price after Monte Carlo simulation: {overall_avg_market_price:.2f}")
 
+    # Plot the market prices
+    fig, ax = plt.subplots()
+    for market_prices in all_market_prices:
+        ax.plot(market_prices, label='Market Price')
+    
+    ax.set_xlabel('Iteration')
+    ax.set_ylabel('Market Price')
+    ax.set_title('Market Price over Iterations')
+    ax.set_ylim(bottom=1)  # Ensure y-axis starts at 1 or higher
+    st.pyplot(fig)
+
+    # Display sample results
     sample_results = results[:10]
     for result in sample_results:
         st.write(f"{result['user_name']} has {result['tokens']} tokens and a balance of {result['balance']} euros. (ID: {result['user_id']})")
