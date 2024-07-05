@@ -147,6 +147,7 @@ def simulate_market(activity_pool, iterations):
         for user in activity_pool.users:
             activity_pool.participate(user)
         activity_pool.market.trade_tokens()
+        activity_pool.market.adjust_market_price()
 
 def monte_carlo_simulation(num_users, iterations, monte_carlo_runs, probability):
     results = []
@@ -166,6 +167,7 @@ def monte_carlo_simulation(num_users, iterations, monte_carlo_runs, probability)
             for user in activity_pool.users:
                 activity_pool.participate(user)
             activity_pool.market.trade_tokens()
+            activity_pool.market.adjust_market_price()
             market_prices.append(market.price)
 
         all_market_prices.append(market_prices)
@@ -194,8 +196,8 @@ if st.button("Run Simulation"):
 
     st.success("Simulation completed!")
 
-    # Calculate average market price
-    avg_market_prices = [np.mean(prices) for prices in all_market_prices]
+    # Calculate average market price for each iteration
+    avg_market_prices = np.mean(all_market_prices, axis=0)
     overall_avg_market_price = np.mean(avg_market_prices)
     st.write(f"Average market price after Monte Carlo simulation: {overall_avg_market_price:.2f}")
 
