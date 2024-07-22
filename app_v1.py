@@ -38,8 +38,6 @@ class User:
     def __repr__(self):
         return f"User({self.user_id}, Tokens: {self.tokens})"
 
-# We willen verschillende type users aanmaken
-
 # Specifieke subklassen voor verschillende typen gebruikers met aangepaste utility-methoden
 class FriendsFamilyUser(User):
     def activity_utility(self):
@@ -50,7 +48,7 @@ class TeamAdvisorsUser(User):
         return super().activity_utility() * 0.5  # We verwachten dat team advisors niet heel vaak mee gaan doen met activiteiten
 
 class GeneralUser(User):
-    def __init__(self, name, balance=10, activity_desire=5):
+    def __init__(self, user_id, balance=10, activity_desire=5):
         super().__init__(user_id, balance, activity_desire)  # Hetzelfde als de normale user
 
 # TokenGenerator: Een klasse die nieuwe tokens genereert en verdeelt aan gebruikers.
@@ -194,7 +192,7 @@ def create_users(num_friends_family, num_team_advisors, num_general):
         users.append(GeneralUser(f"G_User{i+1}"))
     return users
 
-# Monte carlo simulatie
+# Monte Carlo simulatie
 def monte_carlo_simulation(num_friends_family, num_team_advisors, num_general, iterations, monte_carlo_runs):
     """Monte Carlo simulatie voor tokenomics model."""
     all_market_prices = []
