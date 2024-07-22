@@ -195,7 +195,7 @@ def create_users(num_friends_family, num_team_advisors, num_general):
     return users
 
 # Monte carlo simulatie
-def monte_carlo_simulation(num_users, iterations, monte_carlo_runs):
+def monte_carlo_simulation(num_friends_family, num_team_advisors, num_general, iterations, monte_carlo_runs):
     """Monte Carlo simulatie voor tokenomics model."""
     all_market_prices = []
     all_balances = []
