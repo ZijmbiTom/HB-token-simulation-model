@@ -239,7 +239,7 @@ if st.button("Start simulatie"):
         ax.set_xlabel('Iteratie (Dag)')
         ax.set_ylabel('Marktprijs')
         ax.set_title('Marktprijs Ontwikkeling over Iteraties')
-        ax.legend()
+        ax.legend(prop={'size': 6})
         st.pyplot(fig)
         
         # Plot de balans per user
@@ -251,7 +251,7 @@ if st.button("Start simulatie"):
         ax.set_xlabel('Iteratie (Dag)')
         ax.set_ylabel('Balans')
         ax.set_title('Balans Ontwikkeling per User over Iteraties')
-        ax.legend()
+        ax.legend(prop={'size': 6})
         st.pyplot(fig)
         
         # Plot de utility per user
@@ -263,5 +263,5 @@ if st.button("Start simulatie"):
         ax.set_xlabel('Iteratie (Dag)')
         ax.set_ylabel('Utility')
         ax.set_title('Utility Ontwikkeling per User over Iteraties')
-        ax.legend()
+        ax.legend(prop={'size': 6})
         st.pyplot(fig)
