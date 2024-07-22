@@ -1,3 +1,14 @@
+
+"""
+Stel je voor dat we een eenvoudige simulatie willen maken van een systeem dat tokens genereert en toewijst aan gebruikers.
+We beginnen met het definiëren van een paar basisklassen:
+
+1. Token: Een klasse die een enkel token voorstelt.
+2. User: Een klasse die een gebruiker voorstelt die tokens kan ontvangen.
+3. TokenGenerator: Een klasse die nieuwe tokens genereert en verdeelt aan gebruikers.
+"""
+
+# Packages
 import random
 import streamlit as st
 
@@ -11,7 +22,7 @@ class Token:
 
 # 2. User: Een klasse die een gebruiker voorstelt die tokens kan ontvangen én betalen, met een utility curve.
 class User:
-    def __init__(self, user_id, balance=10):
+    def __init__(self, user_id, balance = 10):
         self.user_id = user_id
         self.tokens = []
         self.balance = balance
@@ -37,7 +48,7 @@ class User:
 
 # 3. TokenGenerator: Een klasse die nieuwe tokens genereert en verdeelt aan gebruikers.
 class TokenGenerator:
-    def __init__(self):
+    def __init__ (self):
         self.current_id = 0
         
     def generate_token(self):
@@ -52,7 +63,7 @@ class TokenGenerator:
         
 # De Market klasse beheert het kopen en verkopen van tokens tussen gebruikers.
 class Market:
-    def __init__(self, users, initial_price=1.0, elasticity=0.1):
+    def __init__(self, users, initial_price=1.0, elasticity=0.05):
         self.users = users
         self.price = initial_price
         self.demand = 0
@@ -61,9 +72,9 @@ class Market:
 
     def update_price(self):
         if self.demand > self.supply:
-            self.price *= (1 + self.elasticity)
+            self.price *= (1 + self.elasticity)   # Verhoog de prijs met 10%
         elif self.supply > self.demand:
-            self.price *= (1 - self.elasticity)
+            self.price *= (1 - self.elasticity)  # Verlaag de prijs met 10%
         # Reset demand en supply na het aanpassen van de prijs
         self.demand = 0
         self.supply = 0
@@ -79,7 +90,7 @@ class Market:
                         buyer.receive_tokens(token[0])
                         buyer.balance -= self.price
                         seller.balance += self.price
-                        st.write(f"{buyer.user_id} heeft een token gekocht van {seller.user_id} voor {self.price:.2f} euro.")
+                        print(f"{buyer.user_id} heeft een token gekocht van {seller.user_id} voor {self.price:.2f} euro.")
                         self.demand += 1
                         self.supply -= 1
                         return True, "Success"
@@ -95,7 +106,7 @@ class Market:
                     buyer.receive_tokens(token[0])
                     buyer.balance -= self.price
                     seller.balance += self.price
-                    st.write(f"{seller.user_id} heeft een token verkocht aan {buyer.user_id} voor {self.price:.2f} euro.")
+                    print(f"{seller.user_id} heeft een token verkocht aan {buyer.user_id} voor {self.price:.2f} euro.")
                     self.demand -= 1
                     self.supply += 1
                     return True, "Success"
@@ -103,7 +114,7 @@ class Market:
 
     def adjust_market_price(self):
         self.update_price()
-        st.write(f"De nieuwe marktprijs voor tokens is {self.price:.2f} euro.")
+        print(f"De nieuwe marktprijs voor tokens is {self.price:.2f} euro.")
     
 # 4. Activity Pool: X% kans dat bij deelname je een token krijgt, je kan elke iteratie deelnemen als user        
 class ActivityPool:
@@ -119,41 +130,41 @@ class ActivityPool:
     def assign_tokens(self, user):
         tokens_paid = user.pay_token(num_tokens=self.activity_price)
         if tokens_paid:
-            st.write(f"{user.user_id} heeft {self.activity_price} token(s) betaald.")
+            print(f"{user.user_id} heeft {self.activity_price} token(s) betaald.")
             if random.random() < self.probability:
                 self.token_generator.assign_token_to_user(user, num_tokens=self.received_tokens)
-                st.write(f"{user.user_id} heeft {self.received_tokens} token(s) gekregen.")
+                print(f"{user.user_id} heeft {self.received_tokens} token(s) gekregen.")
             else:
-                st.write(f"{user.user_id} heeft geen tokens gekregen.")
+                print(f"{user.user_id} heeft geen tokens gekregen.")
         else:
-            st.write(f"{user.user_id} heeft niet genoeg tokens om deel te nemen.")
+            print(f"{user.user_id} heeft niet genoeg tokens om deel te nemen.")
             # Probeer een token te kopen van een andere gebruiker
             success, message = self.market.buy_token(user)
             if success:
-                st.write(f"{user.user_id} heeft een token gekocht om deel te nemen.")
+                print(f"{user.user_id} heeft een token gekocht om deel te nemen.")
                 self.assign_tokens(user)
             else:
-                st.write(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
+                print(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
 
     def participate(self, user):
         if user.utility() < self.utility_threshold:
-            st.write(f"{user.user_id} heeft besloten niet deel te nemen vanwege lage utility.")
+            print(f"{user.user_id} heeft besloten niet deel te nemen vanwege lage utility.")
             # Probeer een token te kopen van een andere gebruiker
             success, message = self.market.buy_token(user)
             if success:
-                st.write(f"{user.user_id} heeft een token gekocht om zijn utility te verhogen.")
+                print(f"{user.user_id} heeft een token gekocht om zijn utility te verhogen.")
                 # Herbereken de utility na het kopen van de token
                 if user.utility() >= self.utility_threshold:
-                    st.write(f"{user.user_id} heeft nu genoeg utility om deel te nemen.")
+                    print(f"{user.user_id} heeft nu genoeg utility om deel te nemen.")
                     self.assign_tokens(user)
                 else:
-                    st.write(f"{user.user_id} heeft nog steeds een te lage utility om deel te nemen.")
+                    print(f"{user.user_id} heeft nog steeds een te lage utility om deel te nemen.")
             else:
-                st.write(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
+                print(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
         else:
             self.assign_tokens(user)     
     
-# 5. Initial Release class: 
+# 5. Inital Release class: 
 class InitialRelease:
     def __init__(self, users, token_generator):
         self.users = users
@@ -163,7 +174,7 @@ class InitialRelease:
         for _ in range(num_tokens):
             user = random.choice(self.users) # voeg de num_tokens op een random manier toe
             self.token_generator.assign_token_to_user(user)
-        st.write(f"Initial release of {num_tokens} tokens completed.")        
+        print(f"Inital release of {num_tokens} tokens completed.")        
         
         
 # Simulatie functie
@@ -171,16 +182,16 @@ def simulate_activity(activity_pool, initial_release, iterations):
     initial_release.distribute_tokens(20)
     
     for i in range(iterations):
-        st.write(f"--- Iteratie {i+1} ---")
+        print(f"--- Iteratie {i+1} ---")
         for user in activity_pool.users:
-            st.write(f"{user.user_id} heeft {user.token_count()} tokens.")
-            st.write(f"{user.user_id} heeft {user.balance} balance.")
+            print(f"{user.user_id} heeft {user.token_count()} tokens.")
+            print(f"{user.user_id} heeft {user.balance} balance.")
             # Beslissen om deel te nemen op basis van utility
-            st.write(f"{user.user_id} heeft {user.utility()} utility.")
+            print(f"{user.user_id} heeft {user.utility()} utility.")
             activity_pool.participate(user)
-            st.write("")
+            print("")
         market.adjust_market_price()
-        st.write("")
+        print("")
 
 # Streamlit interface
 st.title("Tokenomics Simulatie")
@@ -217,3 +228,7 @@ if st.button("Run Simulation"):
     st.write(f"{user1.user_id} heeft {user1.token_count()} tokens.")
     st.write(f"{user2.user_id} heeft {user2.token_count()} tokens.")
     st.write(f"{user3.user_id} heeft {user3.token_count()} tokens.") 
+
+        
+        
+        
