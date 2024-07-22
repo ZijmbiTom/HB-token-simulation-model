@@ -1,6 +1,9 @@
 import random
 import math
 import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Token: Een klasse die een enkel token voorstelt.
 class Token: 
@@ -167,6 +170,47 @@ class InitialRelease:
             self.token_generator.assign_token_to_user(user)
         st.write(f"Inital release of {num_tokens} tokens completed.")        
         
+
+# Functie om resultaten te analyseren en te visualiseren
+def analyze_and_visualize_results(results):
+    # Converteer de resultaten naar een DataFrame
+    data = []
+    for sim_index, final_states in enumerate(results):
+        for state in final_states:
+            data.append({
+                'simulation': sim_index,
+                'user_id': state['user_id'],
+                'tokens': state['tokens'],
+                'balance': state['balance']
+            })
+    
+    df = pd.DataFrame(data)
+    
+    # Analyseer de spreiding en verwachtingen
+    summary = df.groupby('user_id').agg({
+        'tokens': ['mean', 'std'],
+        'balance': ['mean', 'std']
+    })
+    summary.columns = ['_'.join(col) for col in summary.columns]
+    
+    st.write("Samenvatting van de resultaten per gebruiker:")
+    st.write(summary)
+    
+    # Visualisatie van de resultaten
+    plt.figure(figsize=(12, 6))
+    sns.histplot(data=df, x='tokens', kde=True)
+    plt.title('Distributie van Tokens over Simulaties')
+    plt.xlabel('Aantal Tokens')
+    plt.ylabel('Frequentie')
+    st.pyplot(plt)
+
+    plt.figure(figsize=(12, 6))
+    sns.histplot(data=df, x='balance', kde=True)
+    plt.title('Distributie van Balances over Simulaties')
+    plt.xlabel('Balance')
+    plt.ylabel('Frequentie')
+    st.pyplot(plt)
+
 # Monte Carlo Simulatie functie
 def monte_carlo_simulation(activity_pool, initial_release, iterations, simulations=1000):
     initial_release.distribute_tokens(20)
@@ -212,7 +256,7 @@ num_users = st.slider("Aantal gebruikers", 1, 50, 3)
 elasticity = st.slider("Elasticiteit", 0.0, 1.0, 0.1)
 probability = st.slider("Waarschijnlijkheid van activiteitspool", 0.0, 1.0, 0.4)
 iterations = st.slider("Aantal iteraties", 1, 50, 10)
-simulations = st.slider("Aantal simulaties", 1, 1000, 50)
+simulations = st.slider("Aantal simulaties", 1, 100, 50)
 
 if st.button("Start simulatie"):
     with st.spinner("Simulatie wordt uitgevoerd..."):
@@ -233,9 +277,12 @@ if st.button("Start simulatie"):
     
         # Monte Carlo simulatie
         results = monte_carlo_simulation(activity_pool, initial_release, iterations, simulations)
-        
+       
         st.write("Simulatie voltooid.")
-        
+       
+        # Analyseer en visualiseer de resultaten
+        analyze_and_visualize_results(results)
+       
         # Toon enkele resultaten
         for user in users:
             st.write(f"{user.user_id} heeft {user.token_count()} tokens en {user.balance} balance.")
