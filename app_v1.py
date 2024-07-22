@@ -1,4 +1,5 @@
 import random
+import math
 import streamlit as st
 
 # Token: Een klasse die een enkel token voorstelt.
@@ -11,10 +12,11 @@ class Token:
 
 # 2. User: Een klasse die een gebruiker voorstelt die tokens kan ontvangen én betalen, met een utility curve.
 class User:
-    def __init__(self, user_id, balance=10):
+    def __init__(self, user_id, balance=10, activity_desire = 5):
         self.user_id = user_id
         self.tokens = []
         self.balance = balance
+        self.activity_desire = activity_desire
         
     def receive_tokens(self, token):
         self.tokens.append(token)
@@ -29,8 +31,8 @@ class User:
     def token_count(self):
         return len(self.tokens)
         
-    def utility(self):
-        return self.token_count() * 2 + self.balance
+    def activity_utility(self):
+        return self.activity_desire * math.log(1 + 1 * self.token_count() * 2 * self.balance)
 
     def __repr__(self):
         return f"User({self.user_id}, Tokens: {self.tokens})"
@@ -136,14 +138,14 @@ class ActivityPool:
                 st.write(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
 
     def participate(self, user):
-        if user.utility() < self.utility_threshold:
+        if user.activity_utility() < self.utility_threshold:
             st.write(f"{user.user_id} heeft besloten niet deel te nemen vanwege lage utility.")
             # Probeer een token te kopen van een andere gebruiker
             success, message = self.market.buy_token(user)
             if success:
                 st.write(f"{user.user_id} heeft een token gekocht om zijn utility te verhogen.")
                 # Herbereken de utility na het kopen van de token
-                if user.utility() >= self.utility_threshold:
+                if user.activity_utility() >= self.utility_threshold:
                     st.write(f"{user.user_id} heeft nu genoeg utility om deel te nemen.")
                     self.assign_tokens(user)
                 else:
@@ -175,7 +177,6 @@ def simulate_activity(activity_pool, initial_release, iterations):
             st.write(f"{user.user_id} heeft {user.token_count()} tokens.")
             st.write(f"{user.user_id} heeft {user.balance} balance.")
             # Beslissen om deel te nemen op basis van utility
-            st.write(f"{user.user_id} heeft {user.utility()} utility.")
             activity_pool.participate(user)
             st.write("")
         market.adjust_market_price()
