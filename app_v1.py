@@ -190,25 +190,26 @@ elasticity = st.slider("Elasticiteit", 0.0, 1.0, 0.1)
 probability = st.slider("Waarschijnlijkheid van activiteitspool", 0.0, 1.0, 0.4)
 iterations = st.slider("Aantal iteraties", 1, 50, 10)
 
-if st.button("Start simulatie"):
-    # Maak users aan
-    users = [User(f"User{i+1}") for i in range(num_users)]
-
-    # Maak een token generator aan 
-    token_generator = TokenGenerator()
-
-    # Creëer een markt met opgegeven elasticiteit
-    market = Market(users, elasticity=elasticity)
-
-    # Maak een ActivityPool aan met opgegeven probability
-    activity_pool = ActivityPool(users, token_generator, market, probability=probability)
-
-    # Maak een InitialRelease aan
-    initial_release = InitialRelease(users, token_generator)
-
-    # Simuleer voor een bepaald aantal iteraties
-    simulate_activity(activity_pool, initial_release, iterations)             
-
-    # Bekijk het aantal tokens van de gebruikers
-    for user in users:
-        st.write(f"{user.user_id} heeft {user.token_count()} tokens en {user.balance} balance.")
+if st.button("Voer Simulatie Uit"):
+    with st.spinner("Simulatie wordt uitgevoerd..."):
+        # Maak users aan
+        users = [User(f"User{i+1}") for i in range(num_users)]
+    
+        # Maak een token generator aan 
+        token_generator = TokenGenerator()
+    
+        # Creëer een markt met opgegeven elasticiteit
+        market = Market(users, elasticity=elasticity)
+    
+        # Maak een ActivityPool aan met opgegeven probability
+        activity_pool = ActivityPool(users, token_generator, market, probability=probability)
+    
+        # Maak een InitialRelease aan
+        initial_release = InitialRelease(users, token_generator)
+    
+        # Simuleer voor een bepaald aantal iteraties
+        simulate_activity(activity_pool, initial_release, iterations)             
+    
+        # Bekijk het aantal tokens van de gebruikers
+        for user in users:
+            st.write(f"{user.user_id} heeft {user.token_count()} tokens en {user.balance} balance.")
