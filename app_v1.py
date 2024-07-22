@@ -3,7 +3,6 @@ import math
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 # Token: Een klasse die een enkel token voorstelt.
 class Token: 
@@ -169,7 +168,6 @@ class InitialRelease:
             user = random.choice(self.users) # voeg de num_tokens op een random manier toe
             self.token_generator.assign_token_to_user(user)
         st.write(f"Inital release of {num_tokens} tokens completed.")        
-        
 
 # Functie om resultaten te analyseren en te visualiseren
 def analyze_and_visualize_results(results):
@@ -198,18 +196,22 @@ def analyze_and_visualize_results(results):
     
     # Visualisatie van de resultaten
     plt.figure(figsize=(12, 6))
-    sns.histplot(data=df, x='tokens', kde=True)
+    df['tokens'].plot(kind='hist', bins=30, density=True, alpha=0.5)
+    df['tokens'].plot(kind='kde')
     plt.title('Distributie van Tokens over Simulaties')
     plt.xlabel('Aantal Tokens')
     plt.ylabel('Frequentie')
     st.pyplot(plt)
+    plt.clf()
 
     plt.figure(figsize=(12, 6))
-    sns.histplot(data=df, x='balance', kde=True)
+    df['balance'].plot(kind='hist', bins=30, density=True, alpha=0.5)
+    df['balance'].plot(kind='kde')
     plt.title('Distributie van Balances over Simulaties')
     plt.xlabel('Balance')
     plt.ylabel('Frequentie')
     st.pyplot(plt)
+    plt.clf()
 
 # Monte Carlo Simulatie functie
 def monte_carlo_simulation(activity_pool, initial_release, iterations, simulations=1000):
