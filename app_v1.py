@@ -219,10 +219,10 @@ def monte_carlo_simulation(num_users, iterations, monte_carlo_runs):
 st.title("Tokenomics Simulatie voor $HEALTH")
 
 num_users = st.slider("Aantal gebruikers", 1, 50, 3)
-elasticity = st.slider("Elasticiteit", 0.0, 1.0, 0.1)
+elasticity = st.slider("Elasticiteit", 0.0, 0,2, 0.1)
 probability = st.slider("Waarschijnlijkheid van activiteitspool", 0.0, 1.0, 0.4)
 iterations = st.slider("Aantal iteraties", 1, 50, 10)
-simulations = st.slider("Aantal simulaties", 1, 1000, 50)
+simulations = st.slider("Aantal simulaties", 1, 100, 50)
 
 if st.button("Start simulatie"):
     with st.spinner("Simulatie wordt uitgevoerd..."):
@@ -239,7 +239,7 @@ if st.button("Start simulatie"):
         ax.set_xlabel('Iteratie (Dag)')
         ax.set_ylabel('Marktprijs')
         ax.set_title('Marktprijs Ontwikkeling over Iteraties')
-        ax.legend()
+        ax.legend(prop={'size': 6})
         st.pyplot(fig)
         
         # Plot de balans per user
@@ -251,7 +251,7 @@ if st.button("Start simulatie"):
         ax.set_xlabel('Iteratie (Dag)')
         ax.set_ylabel('Balans')
         ax.set_title('Balans Ontwikkeling per User over Iteraties')
-        ax.legend()
+        ax.legend(prop={'size': 6})
         st.pyplot(fig)
         
         # Plot de utility per user
@@ -263,5 +263,5 @@ if st.button("Start simulatie"):
         ax.set_xlabel('Iteratie (Dag)')
         ax.set_ylabel('Utility')
         ax.set_title('Utility Ontwikkeling per User over Iteraties')
-        ax.legend()
+        ax.legend(prop={'size': 6})
         st.pyplot(fig)
