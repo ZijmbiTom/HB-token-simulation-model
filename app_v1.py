@@ -200,7 +200,7 @@ elasticity = st.slider("Elasticiteit", 0.0, 1.0, 0.1)
 probability = st.slider("Waarschijnlijkheid van activiteitspool", 0.0, 1.0, 0.4)
 iterations = st.slider("Aantal iteraties", 1, 50, 10)
 
-if st.button("Run Simulation"):
+if st.button("Start simulatie"):
     # Maak users aan
     user1 = User("User1")
     user2 = User("User2")
