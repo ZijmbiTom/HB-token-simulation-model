@@ -1,6 +1,7 @@
 import random
 import math
 import streamlit as st
+import matplotlib.pyplot as plt
 
 # Token: Een klasse die een enkel token voorstelt.
 class Token: 
@@ -168,10 +169,14 @@ class InitialRelease:
         st.write(f"Inital release of {num_tokens} tokens completed.")        
         
 
+
 def monte_carlo_simulation(num_users, iterations, monte_carlo_runs):
     """Monte Carlo simulatie voor tokenomics model."""
-    results = []
-    for _ in range(monte_carlo_runs):
+    all_market_prices = []
+    all_balances = []
+    all_utilities = []
+    
+    for run in range(monte_carlo_runs):
         # Create users
         users = [User(f"user{i+1}") for i in range(num_users)]
         
@@ -188,22 +193,27 @@ def monte_carlo_simulation(num_users, iterations, monte_carlo_runs):
         # Create an ActivityPool with default parameters
         activity_pool = ActivityPool(users, token_generator, market)
         
+        market_prices = []
+        balances = {user.user_id: [] for user in users}
+        utilities = {user.user_id: [] for user in users}
+        
         # Run the market simulation
         for _ in range(iterations):
             for user in activity_pool.users:
                 if random.random() < activity_pool.probability:
                     activity_pool.participate(user)
             activity_pool.market.adjust_market_price()
+            market_prices.append(activity_pool.market.price)
+            
+            for user in users:
+                balances[user.user_id].append(user.balance)
+                utilities[user.user_id].append(user.activity_utility())
         
-        # Collect results
-        for user in users:
-            results.append({
-                "user_name": user.user_id,
-                "tokens": user.token_count(),
-                "balance": user.balance,
-                "final_utility": user.activity_utility()
-            })
-    return results
+        all_market_prices.append(market_prices)
+        all_balances.append(balances)
+        all_utilities.append(utilities)
+    
+    return all_market_prices, all_balances, all_utilities
 
 # Streamlit interface
 st.title("Tokenomics Simulatie voor $HEALTH")
@@ -217,10 +227,41 @@ simulations = st.slider("Aantal simulaties", 1, 1000, 50)
 if st.button("Start simulatie"):
     with st.spinner("Simulatie wordt uitgevoerd..."):
         # Monte Carlo simulatie
-        results = monte_carlo_simulation(num_users, iterations, simulations)
+        all_market_prices, all_balances, all_utilities = monte_carlo_simulation(num_users, iterations, simulations)
         
         st.write("Simulatie voltooid.")
         
-        # Toon enkele resultaten
-        for result in results[:min(len(results), 10)]:  # Show up to 10 results
-            st.write(f"{result['user_name']} heeft {result['tokens']} tokens en {result['balance']} balance. Final Utility: {result['final_utility']:.2f}")
+        # Plot de marktprijzen
+        st.subheader("Marktprijs Ontwikkeling over Iteraties")
+        fig, ax = plt.subplots()
+        for i, market_prices in enumerate(all_market_prices):
+            ax.plot(market_prices, label=f'Run {i+1}')
+        ax.set_xlabel('Iteratie (Dag)')
+        ax.set_ylabel('Marktprijs')
+        ax.set_title('Marktprijs Ontwikkeling over Iteraties')
+        ax.legend()
+        st.pyplot(fig)
+        
+        # Plot de balans per user
+        st.subheader("Balans Ontwikkeling per User over Iteraties")
+        fig, ax = plt.subplots()
+        for user_id in all_balances[0].keys():
+            for i, balances in enumerate(all_balances):
+                ax.plot(balances[user_id], label=f'{user_id} Run {i+1}')
+        ax.set_xlabel('Iteratie (Dag)')
+        ax.set_ylabel('Balans')
+        ax.set_title('Balans Ontwikkeling per User over Iteraties')
+        ax.legend()
+        st.pyplot(fig)
+        
+        # Plot de utility per user
+        st.subheader("Utility Ontwikkeling per User over Iteraties")
+        fig, ax = plt.subplots()
+        for user_id in all_utilities[0].keys():
+            for i, utilities in enumerate(all_utilities):
+                ax.plot(utilities[user_id], label=f'{user_id} Run {i+1}')
+        ax.set_xlabel('Iteratie (Dag)')
+        ax.set_ylabel('Utility')
+        ax.set_title('Utility Ontwikkeling per User over Iteraties')
+        ax.legend()
+        st.pyplot(fig)
