@@ -38,6 +38,21 @@ class User:
     def __repr__(self):
         return f"User({self.user_id}, Tokens: {self.tokens})"
 
+# We willen verschillende type users aanmaken
+
+# Specifieke subklassen voor verschillende typen gebruikers met aangepaste utility-methoden
+class FriendsFamilyUser(User):
+    def activity_utility(self):
+        return super().activity_utility() * 1.5  # We verwachten dat vrienden en family wel vaak mee gaan doen met activiteiten
+
+class TeamAdvisorsUser(User):
+    def activity_utility(self):
+        return super().activity_utility() * 0.5  # We verwachten dat team advisors niet heel vaak mee gaan doen met activiteiten
+
+class GeneralUser(User):
+    def __init__(self, name, balance=10, activity_desire=5):
+        super().__init__(user_id, balance, activity_desire)  # Hetzelfde als de normale user
+
 # TokenGenerator: Een klasse die nieuwe tokens genereert en verdeelt aan gebruikers.
 class TokenGenerator:
     def __init__(self):
@@ -168,8 +183,18 @@ class InitialRelease:
             self.token_generator.assign_token_to_user(user)
         st.write(f"Inital release of {num_tokens} tokens completed.")        
         
+# Functie om gebruikers aan te maken
+def create_users(num_friends_family, num_team_advisors, num_general):
+    users = []
+    for i in range(num_friends_family):
+        users.append(FriendsFamilyUser(f"FF_User{i+1}"))
+    for i in range(num_team_advisors):
+        users.append(TeamAdvisorsUser(f"TA_User{i+1}"))
+    for i in range(num_general):
+        users.append(GeneralUser(f"G_User{i+1}"))
+    return users
 
-
+# Monte carlo simulatie
 def monte_carlo_simulation(num_users, iterations, monte_carlo_runs):
     """Monte Carlo simulatie voor tokenomics model."""
     all_market_prices = []
@@ -178,7 +203,7 @@ def monte_carlo_simulation(num_users, iterations, monte_carlo_runs):
     
     for run in range(monte_carlo_runs):
         # Create users
-        users = [User(f"user{i+1}") for i in range(num_users)]
+        users = create_users(num_friends_family, num_team_advisors, num_general)
         
         # Create a token generator
         token_generator = TokenGenerator()
@@ -218,16 +243,18 @@ def monte_carlo_simulation(num_users, iterations, monte_carlo_runs):
 # Streamlit interface
 st.title("Tokenomics Simulatie voor $HEALTH")
 
-num_users = st.slider("Aantal gebruikers", 1, 50, 3)
+num_friends_family = st.slider("Aantal Friends & Family gebruikers", 0, 50, 3)
+num_team_advisors = st.slider("Aantal Team Advisors gebruikers", 0, 50, 3)
+num_general = st.slider("Aantal General gebruikers", 0, 50, 3)
 elasticity = st.slider("Elasticiteit", 0.0, 1.0, 0.1)
 probability = st.slider("Waarschijnlijkheid van activiteitspool", 0.0, 1.0, 0.4)
 iterations = st.slider("Aantal iteraties", 1, 50, 10)
-simulations = st.slider("Aantal simulaties", 1, 1000, 50)
+simulations = st.slider("Aantal simulaties", 1, 100, 50)
 
 if st.button("Start simulatie"):
     with st.spinner("Simulatie wordt uitgevoerd..."):
         # Monte Carlo simulatie
-        all_market_prices, all_balances, all_utilities = monte_carlo_simulation(num_users, iterations, simulations)
+        all_market_prices, all_balances, all_utilities = monte_carlo_simulation(num_friends_family, num_team_advisors, num_general, iterations, simulations)
         
         st.write("Simulatie voltooid.")
         
