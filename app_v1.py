@@ -1,13 +1,3 @@
-"""
-Stel je voor dat we een eenvoudige simulatie willen maken van een systeem dat tokens genereert en toewijst aan gebruikers.
-We beginnen met het definiëren van een paar basisklassen:
-
-1. Token: Een klasse die een enkel token voorstelt.
-2. User: Een klasse die een gebruiker voorstelt die tokens kan ontvangen.
-3. TokenGenerator: Een klasse die nieuwe tokens genereert en verdeelt aan gebruikers.
-"""
-
-# Packages
 import random
 import streamlit as st
 
@@ -175,7 +165,6 @@ class InitialRelease:
             self.token_generator.assign_token_to_user(user)
         st.write(f"Inital release of {num_tokens} tokens completed.")        
         
-        
 # Simulatie functie
 def simulate_activity(activity_pool, initial_release, iterations):
     initial_release.distribute_tokens(20)
@@ -195,21 +184,17 @@ def simulate_activity(activity_pool, initial_release, iterations):
 # Streamlit interface
 st.title("Tokenomics Simulatie")
 
+num_users = st.slider("Aantal gebruikers", 1, 50, 3)
 elasticity = st.slider("Elasticiteit", 0.0, 1.0, 0.1)
 probability = st.slider("Waarschijnlijkheid van activiteitspool", 0.0, 1.0, 0.4)
 iterations = st.slider("Aantal iteraties", 1, 50, 10)
 
 if st.button("Start simulatie"):
     # Maak users aan
-    user1 = User("User1")
-    user2 = User("User2")
-    user3 = User("User3")
+    users = [User(f"User{i+1}") for i in range(num_users)]
 
     # Maak een token generator aan 
     token_generator = TokenGenerator()
-
-    # Lijst van gebruikers
-    users = [user1, user2, user3]
 
     # Creëer een markt met opgegeven elasticiteit
     market = Market(users, elasticity=elasticity)
@@ -224,6 +209,5 @@ if st.button("Start simulatie"):
     simulate_activity(activity_pool, initial_release, iterations)             
 
     # Bekijk het aantal tokens van de gebruikers
-    st.write(f"{user1.user_id} heeft {user1.token_count()} tokens.")
-    st.write(f"{user2.user_id} heeft {user2.token_count()} tokens.")
-    st.write(f"{user3.user_id} heeft {user3.token_count()} tokens.")
+    for user in users:
+        st.write(f"{user.user_id} heeft {user.token_count()} tokens en {user.balance} balance.")
