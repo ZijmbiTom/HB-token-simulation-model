@@ -167,42 +167,42 @@ class InitialRelease:
             self.token_generator.assign_token_to_user(user)
         st.write(f"Inital release of {num_tokens} tokens completed.")        
         
-# Monte Carlo Simulatie functie
-def monte_carlo_simulation(activity_pool, initial_release, iterations, simulations=100):
-    initial_release.distribute_tokens(20)
-    
+
+def monte_carlo_simulation(num_users, iterations, monte_carlo_runs):
+    """Monte Carlo simulatie voor tokenomics model."""
     results = []
-    
-    for _ in range(simulations):
-        user_states = []
-        for user in activity_pool.users:
-            user_states.append({
-                'user_id': user.user_id,
-                'tokens': user.token_count(),
-                'balance': user.balance
-            })
+    for _ in range(monte_carlo_runs):
+        # Create users
+        users = [User(f"user{i+1}") for i in range(num_users)]
         
+        # Create a token generator
+        token_generator = TokenGenerator()
+        
+        # Create a market with default elasticity
+        market = Market(users)
+        
+        # Create an InitialRelease and distribute tokens
+        initial_release = InitialRelease(users, token_generator)
+        initial_release.distribute_tokens(10)
+        
+        # Create an ActivityPool with default parameters
+        activity_pool = ActivityPool(users, token_generator, market)
+        
+        # Run the market simulation
         for _ in range(iterations):
             for user in activity_pool.users:
                 if random.random() < activity_pool.probability:
                     activity_pool.participate(user)
             activity_pool.market.adjust_market_price()
         
-        final_states = []
-        for user in activity_pool.users:
-            final_states.append({
-                'user_id': user.user_id,
-                'tokens': user.token_count(),
-                'balance': user.balance
+        # Collect results
+        for user in users:
+            results.append({
+                "user_name": user.user_id,
+                "tokens": user.token_count(),
+                "balance": user.balance,
+                "final_utility": user.activity_utility()
             })
-        
-        results.append(final_states)
-        
-        # Reset user states for next simulation
-        for state, user in zip(user_states, activity_pool.users):
-            user.tokens = [Token(i) for i in range(state['tokens'])]
-            user.balance = state['balance']
-    
     return results
 
 # Streamlit interface
@@ -216,26 +216,11 @@ simulations = st.slider("Aantal simulaties", 1, 1000, 50)
 
 if st.button("Start simulatie"):
     with st.spinner("Simulatie wordt uitgevoerd..."):
-        # Maak users aan
-        users = [User(f"User{i+1}") for i in range(num_users)]
-    
-        # Maak een token generator aan 
-        token_generator = TokenGenerator()
-    
-        # Creëer een markt met opgegeven elasticiteit
-        market = Market(users, elasticity=elasticity)
-    
-        # Maak een ActivityPool aan met opgegeven probability
-        activity_pool = ActivityPool(users, token_generator, market, probability=probability)
-    
-        # Maak een InitialRelease aan
-        initial_release = InitialRelease(users, token_generator)
-    
         # Monte Carlo simulatie
-        results = monte_carlo_simulation(activity_pool, initial_release, iterations, simulations)
+        results = monte_carlo_simulation(num_users, iterations, simulations)
         
         st.write("Simulatie voltooid.")
         
         # Toon enkele resultaten
-        for user in users:
-            st.write(f"{user.user_id} heeft {user.token_count()} tokens en {user.balance} balance.")
+        for result in results[:min(len(results), 10)]:  # Show up to 10 results
+            st.write(f"{result['user_name']} heeft {result['tokens']} tokens en {result['balance']} balance. Final Utility: {result['final_utility']:.2f}")
