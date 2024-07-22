@@ -1,381 +1,229 @@
-import random
-import numpy as np
-import uuid
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
+"""
+Stel je voor dat we een eenvoudige simulatie willen maken van een systeem dat tokens genereert en toewijst aan gebruikers.
+We beginnen met het definiëren van een paar basisklassen:
 
-# Definiëren van de Token klasse
-class Token:
-    def __init__(self):
-        self.token_id = uuid.uuid4()  # Unieke ID voor elk token
+1. Token: Een klasse die een enkel token voorstelt.
+2. User: Een klasse die een gebruiker voorstelt die tokens kan ontvangen.
+3. TokenGenerator: Een klasse die nieuwe tokens genereert en verdeelt aan gebruikers.
+"""
+
+# Packages
+import random
+import streamlit as st
+
+# Token: Een klasse die een enkel token voorstelt.
+class Token: 
+    def __init__(self, token_id):
+        self.token_id = token_id
 
     def __repr__(self):
         return f"Token({self.token_id})"
 
-# Basis User klasse
+# 2. User: Een klasse die een gebruiker voorstelt die tokens kan ontvangen én betalen, met een utility curve.
 class User:
-    def __init__(self, name, balance=10, activity_desire=5):
-        self.name = name
-        self.user_id = uuid.uuid4()  # Unieke ID voor elke gebruiker
+    def __init__(self, user_id, balance=10):
+        self.user_id = user_id
         self.tokens = []
         self.balance = balance
-        self.activity_desire = activity_desire
-
+        
     def receive_tokens(self, token):
-        self.tokens.append(token)  # Gebruiker ontvangt tokens
-
+        self.tokens.append(token)
+        
     def pay_token(self, num_tokens=1):
         if self.token_count() >= num_tokens:
             tokens_paid = [self.tokens.pop(0) for _ in range(num_tokens)]
             return tokens_paid
-        return None  # Als de gebruiker niet genoeg tokens heeft
+        else:
+            return None
 
     def token_count(self):
-        return len(self.tokens)  # Aantal tokens in bezit van de gebruiker
-
-    def activity_utility(self):
-        return (self.token_count() * 2 + self.balance) * self.activity_desire
-
-    def buy_utility(self, market_price):
-        return (self.balance / market_price) * self.activity_desire
-
-    def sell_utility(self, market_price):
-        return self.token_count() * market_price * (1 / self.activity_desire)
+        return len(self.tokens)
+        
+    def utility(self):
+        return self.token_count() * 2 + self.balance
 
     def __repr__(self):
-        return f"User(Name: {self.name}, ID: {self.user_id}, Tokens: {self.tokens}, Balance: {self.balance}, ActivityDesire: {self.activity_desire})"
+        return f"User({self.user_id}, Tokens: {self.tokens})"
 
-# Specifieke subklassen voor verschillende typen gebruikers met aangepaste utility-methoden
-class FriendsFamilyUser(User):
-    def activity_utility(self):
-        return super().activity_utility() * 1.5  # 50% hogere activity utility
-
-    def buy_utility(self, market_price):
-        return super().buy_utility(market_price) * 1.5  # 50% hogere buy utility
-
-    def sell_utility(self, market_price):
-        return super().sell_utility(market_price) * 0.5  # 50% lagere sell utility
-
-class TeamAdvisorsUser(User):
-    def activity_utility(self):
-        return super().activity_utility() * 1.5  # 50% hogere activity utility
-
-    def buy_utility(self, market_price):
-        return super().buy_utility(market_price) * 1.5  # 50% hogere buy utility
-
-    def sell_utility(self, market_price):
-        return super().sell_utility(market_price) * 0.5  # 50% lagere sell utility
-
-class GeneralUser(User):
-    def __init__(self, name, balance=10, activity_desire=5):
-        super().__init__(name, balance, activity_desire)  # Gebruik de initializer van de basis User klasse
-
-# Definiëren van de TokenGenerator klasse
+# 3. TokenGenerator: Een klasse die nieuwe tokens genereert en verdeelt aan gebruikers.
 class TokenGenerator:
     def __init__(self):
         self.current_id = 0
-
+        
     def generate_token(self):
-        token = Token()
+        token = Token(self.current_id)
+        self.current_id += 1
         return token
-
+    
     def assign_token_to_user(self, user, num_tokens=1):
         for _ in range(num_tokens):
             token = self.generate_token()
-            user.receive_tokens(token)  # Ken tokens toe aan de gebruiker
-
-# Definiëren van de Market klasse
+            user.receive_tokens(token)
+        
+# De Market klasse beheert het kopen en verkopen van tokens tussen gebruikers.
 class Market:
-    def __init__(self, users, initial_price=1.0):
+    def __init__(self, users, initial_price=1.0, elasticity=0.05):
         self.users = users
         self.price = initial_price
         self.demand = 0
         self.supply = 0
+        self.elasticity = elasticity
 
     def update_price(self):
         if self.demand > self.supply:
-            self.price *= 1.1
+            self.price *= (1 + self.elasticity)   # Verhoog de prijs met 10%
         elif self.supply > self.demand:
-            self.price *= 0.9
+            self.price *= (1 - self.elasticity)  # Verlaag de prijs met 10%
+        # Reset demand en supply na het aanpassen van de prijs
         self.demand = 0
         self.supply = 0
 
     def buy_token(self, buyer):
-        if buyer.balance >= self.price:
-            token = Token()
-            buyer.receive_tokens(token)
-            buyer.balance -= self.price
-            self.demand += 1
-            return True, "Success"
-        return False, "Not enough balance to buy a token."
+        sellers = self.users[:]
+        random.shuffle(sellers)
+        for seller in sellers:
+            if seller != buyer and seller.token_count() > 0:
+                if buyer.balance >= self.price:
+                    token = seller.pay_token()
+                    if token:
+                        buyer.receive_tokens(token[0])
+                        buyer.balance -= self.price
+                        seller.balance += self.price
+                        st.write(f"{buyer.user_id} heeft een token gekocht van {seller.user_id} voor {self.price:.2f} euro.")
+                        self.demand += 1
+                        self.supply -= 1
+                        return True, "Success"
+                else:
+                    return False, "Niet genoeg geld om een token te kopen."
+        return False, "Geen tokens beschikbaar van andere gebruikers."
 
     def sell_token(self, seller):
-        if seller.token_count() > 0:
-            token = seller.pay_token()[0]
-            seller.balance += self.price
-            self.supply += 1
-            return True, "Success"
-        return False, "No tokens available to sell."
-
-    def trade_tokens(self):
-        for user in self.users:
-            if user.sell_utility(self.price) > user.buy_utility(self.price):
-                success, message = self.sell_token(user)
-                if success:
-                    continue
-            elif user.buy_utility(self.price) > user.sell_utility(self.price):
-                success, message = self.buy_token(user)
-                if success:
-                    continue
+        for buyer in self.users:
+            if buyer != seller and buyer.balance >= self.price:
+                token = seller.pay_token()
+                if token:
+                    buyer.receive_tokens(token[0])
+                    buyer.balance -= self.price
+                    seller.balance += self.price
+                    st.write(f"{seller.user_id} heeft een token verkocht aan {buyer.user_id} voor {self.price:.2f} euro.")
+                    self.demand -= 1
+                    self.supply += 1
+                    return True, "Success"
+        return False, "Geen kopers beschikbaar voor de tokens."
 
     def adjust_market_price(self):
         self.update_price()
-
-# Definiëren van de ActivityPool klasse
+        st.write(f"De nieuwe marktprijs voor tokens is {self.price:.2f} euro.")
+    
+# 4. Activity Pool: X% kans dat bij deelname je een token krijgt, je kan elke iteratie deelnemen als user        
 class ActivityPool:
-    def __init__(self, users, token_generator, market, probability=0.2, activity_price=2, received_tokens=3, activity_utility_threshold=10):
+    def __init__(self, users, token_generator, market, probability=0.4, activity_price=2, received_tokens=5, utility_threshold=10):
         self.users = users
         self.token_generator = token_generator
         self.market = market
         self.probability = probability
         self.activity_price = activity_price
         self.received_tokens = received_tokens
-        self.activity_utility_threshold = activity_utility_threshold
+        self.utility_threshold = utility_threshold
 
     def assign_tokens(self, user):
         tokens_paid = user.pay_token(num_tokens=self.activity_price)
         if tokens_paid:
+            st.write(f"{user.user_id} heeft {self.activity_price} token(s) betaald.")
             if random.random() < self.probability:
-                for _ in range(self.received_tokens):
-                    token = self.token_generator.generate_token()
-                    user.receive_tokens(token)
+                self.token_generator.assign_token_to_user(user, num_tokens=self.received_tokens)
+                st.write(f"{user.user_id} heeft {self.received_tokens} token(s) gekregen.")
+            else:
+                st.write(f"{user.user_id} heeft geen tokens gekregen.")
         else:
+            st.write(f"{user.user_id} heeft niet genoeg tokens om deel te nemen.")
+            # Probeer een token te kopen van een andere gebruiker
             success, message = self.market.buy_token(user)
             if success:
+                st.write(f"{user.user_id} heeft een token gekocht om deel te nemen.")
                 self.assign_tokens(user)
+            else:
+                st.write(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
 
     def participate(self, user):
-        if user.activity_utility() >= self.activity_utility_threshold:
-            self.assign_tokens(user)
-
-# Definiëren van de Reserve klasse en subklassen
-class Reserve:
-    def __init__(self, name, total_tokens):
-        self.name = name
-        self.total_tokens = total_tokens
-
-    def __repr__(self):
-        return f"Reserve(Name: {self.name}, TotalTokens: {self.total_tokens})"
-
-class PublicSaleAirdrop(Reserve):
-    pass
-
-class Ecosystem(Reserve):
-    pass
-
-class MiningPool(Reserve):
-    pass
-
-class Liquidity(Reserve):
-    pass
-
-class InitialRelease:
-    def __init__(self, users, reserves, token_generator):
-        self.users = users
-        self.reserves = reserves
-        self.token_generator = token_generator
-
-    def distribute_tokens(self, distribution_plan):
-        for category, details in distribution_plan.items():
-            total_tokens = details['total_tokens']
-            tge_percentage = details['tge_percentage']
-            linear_vesting_months = details['linear_vesting_months']
-            
-            tge_tokens = int(total_tokens * tge_percentage)
-            vesting_tokens = total_tokens - tge_tokens
-            
-            if category in self.users:
-                # Verdeel TGE tokens direct naar gebruikerscategorieën
-                for _ in range(tge_tokens):
-                    user = random.choice(self.users[category])
-                    self.token_generator.assign_token_to_user(user)
-
-                # Verdeel resterende tokens lineair over de vesting periode (elke maand = 30 iteraties)
-                if linear_vesting_months > 0:
-                    monthly_tokens = vesting_tokens // linear_vesting_months
-                    for user in self.users[category]:
-                        user.vesting_schedule = [monthly_tokens] * linear_vesting_months
+        if user.utility() < self.utility_threshold:
+            st.write(f"{user.user_id} heeft besloten niet deel te nemen vanwege lage utility.")
+            # Probeer een token te kopen van een andere gebruiker
+            success, message = self.market.buy_token(user)
+            if success:
+                st.write(f"{user.user_id} heeft een token gekocht om zijn utility te verhogen.")
+                # Herbereken de utility na het kopen van de token
+                if user.utility() >= self.utility_threshold:
+                    st.write(f"{user.user_id} heeft nu genoeg utility om deel te nemen.")
+                    self.assign_tokens(user)
+                else:
+                    st.write(f"{user.user_id} heeft nog steeds een te lage utility om deel te nemen.")
             else:
-                # Wijs tokens toe aan reserves
-                self.reserves[category].total_tokens += total_tokens
-
-        print("Initial token distribution completed.")
-
-
-# Simulatie van de markt
-def simulate_market(activity_pool, iterations):
-    for _ in range(iterations):
+                st.write(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
+        else:
+            self.assign_tokens(user)     
+    
+# 5. Inital Release class: 
+class InitialRelease:
+    def __init__(self, users, token_generator):
+        self.users = users
+        self.token_generator = token_generator
+        
+    def distribute_tokens(self, num_tokens):
+        for _ in range(num_tokens):
+            user = random.choice(self.users) # voeg de num_tokens op een random manier toe
+            self.token_generator.assign_token_to_user(user)
+        st.write(f"Inital release of {num_tokens} tokens completed.")        
+        
+        
+# Simulatie functie
+def simulate_activity(activity_pool, initial_release, iterations):
+    initial_release.distribute_tokens(20)
+    
+    for i in range(iterations):
+        st.write(f"--- Iteratie {i+1} ---")
         for user in activity_pool.users:
+            st.write(f"{user.user_id} heeft {user.token_count()} tokens.")
+            st.write(f"{user.user_id} heeft {user.balance} balance.")
+            # Beslissen om deel te nemen op basis van utility
+            st.write(f"{user.user_id} heeft {user.utility()} utility.")
             activity_pool.participate(user)
-        activity_pool.market.trade_tokens()
-        activity_pool.market.adjust_market_price()
+            st.write("")
+        market.adjust_market_price()
+        st.write("")
 
-def monte_carlo_simulation(num_users, iterations, monte_carlo_runs, probability):
-    total_tokens = 500000000  # Totaal aantal tokens
+# Streamlit interface
+st.title("Tokenomics Simulatie")
 
-    distribution_plan = {
-        "FriendsFamily": {"percentage": 0.025, "tge_percentage": 0.3, "linear_vesting_months": 12},
-        "PublicSaleAirdrop": {"percentage": 0.136, "tge_percentage": 0.2, "linear_vesting_months": 12},
-        "Ecosystem": {"percentage": 0.28, "tge_percentage": 0.15, "linear_vesting_months": 24},
-        "MiningPool": {"percentage": 0.27, "tge_percentage": 0.1, "linear_vesting_months": 38},
-        "TeamAdvisors": {"percentage": 0.195, "tge_percentage": 0.1, "linear_vesting_months": 24},
-        "Liquidity": {"percentage": 0.1, "tge_percentage": 1.0, "linear_vesting_months": 0}
-    }
+elasticity = st.slider("Elasticiteit", 0.0, 1.0, 0.1)
+probability = st.slider("Waarschijnlijkheid van activiteitspool", 0.0, 1.0, 0.4)
+iterations = st.slider("Aantal iteraties", 1, 50, 10)
 
-    results = []
-    all_market_prices = []
+if st.button("Start simulatie"):
+    # Maak users aan
+    user1 = User("User1")
+    user2 = User("User2")
+    user3 = User("User3")
 
-    for _ in range(monte_carlo_runs):
-        # Initialiseer gebruikers en reserves
-        friends_family_users = [FriendsFamilyUser(f"ff_user{i+1}") for i in range(100)]
-        team_advisors_users = [TeamAdvisorsUser(f"ta_user{i+1}") for i in range(50)]
-        general_users = [GeneralUser(f"gen_user{i+1}") for i in range(num_users)]
+    # Maak een token generator aan 
+    token_generator = TokenGenerator()
 
-        all_users = {
-            "FriendsFamily": friends_family_users,
-            "TeamAdvisors": team_advisors_users,
-            "General": general_users
-        }
+    # Lijst van gebruikers
+    users = [user1, user2, user3]
 
-        reserves = {
-            "PublicSaleAirdrop": PublicSaleAirdrop("PublicSaleAirdrop", 0),
-            "Ecosystem": Ecosystem("Ecosystem", 0),
-            "MiningPool": MiningPool("MiningPool", 0),
-            "Liquidity": Liquidity("Liquidity", 0)
-        }
+    # Creëer een markt met opgegeven elasticiteit
+    market = Market(users, elasticity=elasticity)
 
-        token_generator = TokenGenerator()
-        initial_release = InitialRelease(all_users, reserves, token_generator)
+    # Maak een ActivityPool aan met opgegeven probability
+    activity_pool = ActivityPool(users, token_generator, market, probability=probability)
 
-        # Bereken het distributieplan op basis van het percentage
-        distribution_plan_calculated = {
-            category: {
-                "total_tokens": int(total_tokens * details["percentage"]),
-                "tge_percentage": details["tge_percentage"],
-                "linear_vesting_months": details["linear_vesting_months"]
-            }
-            for category, details in distribution_plan.items()
-        }
+    # Maak een InitialRelease aan
+    initial_release = InitialRelease(users, token_generator)
 
-        # Distribute tokens volgens het distributieplan
-        initial_release.distribute_tokens(distribution_plan_calculated)
+    # Simuleer voor een bepaald aantal iteraties
+    simulate_activity(activity_pool, initial_release, iterations)             
 
-        market = Market(general_users + friends_family_users + team_advisors_users)
-        activity_pool = ActivityPool(general_users + friends_family_users + team_advisors_users, token_generator, market, probability=probability)
-
-        market_prices = []
-
-        for iteration in range(iterations):
-            # Vrijgave van maandelijkse tokens aan gebruikers
-            if iteration % 30 == 0:  # Elke 30 iteraties is een nieuwe maand
-                for category in ["FriendsFamily", "TeamAdvisors"]:
-                    for user in all_users[category]:
-                        if hasattr(user, 'vesting_schedule') and user.vesting_schedule:
-                            monthly_tokens = user.vesting_schedule.pop(0)
-                            for _ in range(monthly_tokens):
-                                token = token_generator.generate_token()
-                                user.receive_tokens(token)
-
-            for user in activity_pool.users:
-                activity_pool.participate(user)
-            activity_pool.market.trade_tokens()
-            activity_pool.market.adjust_market_price()
-            market_prices.append(market.price)
-
-        all_market_prices.append(market_prices)
-        for user in general_users + friends_family_users + team_advisors_users:
-            results.append({
-                "user_name": user.name,
-                "user_id": user.user_id,
-                "tokens": user.token_count(),
-                "balance": user.balance,
-                "final_utility": user.activity_utility()
-            })
-
-    return results, all_market_prices
-
-# Aangepaste functies en klassen (zoals hierboven geïmplementeerd)
-
-# Functie om initial release per groep te berekenen
-def get_initial_release(distribution_plan, total_tokens):
-    initial_release = {
-        category: {
-            "initial_tokens": int(total_tokens * details["percentage"]),
-            "tge_tokens": int(total_tokens * details["percentage"] * details["tge_percentage"]),
-            "vesting_tokens": int(total_tokens * details["percentage"] * (1 - details["tge_percentage"]))
-        }
-        for category, details in distribution_plan.items()
-    }
-    return initial_release
-
-# Streamlit app configuratie
-st.title("Monte Carlo Simulatie voor $HEALTH Tokens")
-
-# Invoerparameters
-total_tokens = st.number_input("Totaal aantal Tokens", value=500000000)
-num_users = st.slider("Aantal Gebruikers", 5, 1000, 500)
-iterations = st.slider("Iteraties per Run (Dagen)", 10, 300, 150)
-monte_carlo_runs = st.slider("Monte Carlo Runs", 10, 100, 50)
-probability = st.slider("Activiteiten Deelname Waarschijnlijkheid", 0.0, 1.0, 0.9)
-
-if st.button("Voer Simulatie Uit"):
-    with st.spinner("Simulatie wordt uitgevoerd..."):
-        results, all_market_prices = monte_carlo_simulation(num_users, iterations, monte_carlo_runs, probability)
-
-    st.success("Simulatie voltooid!")
-
-    # Bereken initial release
-    distribution_plan = {
-        "FriendsFamily": {"percentage": 0.025, "tge_percentage": 0.3, "linear_vesting_months": 12},
-        "PublicSaleAirdrop": {"percentage": 0.136, "tge_percentage": 0.2, "linear_vesting_months": 12},
-        "Ecosystem": {"percentage": 0.28, "tge_percentage": 0.15, "linear_vesting_months": 24},
-        "MiningPool": {"percentage": 0.27, "tge_percentage": 0.1, "linear_vesting_months": 38},
-        "TeamAdvisors": {"percentage": 0.195, "tge_percentage": 0.1, "linear_vesting_months": 24},
-        "Liquidity": {"percentage": 0.1, "tge_percentage": 1.0, "linear_vesting_months": 0}
-    }
-    initial_release_stats = get_initial_release(distribution_plan, total_tokens)
-
-    # Toon initiële tokenverdeling per groep
-    st.subheader("Initiële Tokenverdeling per Groep")
-    initial_release_df = pd.DataFrame(initial_release_stats).T
-    st.dataframe(initial_release_df)
-
-    # Bereken gemiddelde marktprijs voor elke iteratie
-    avg_market_prices = np.mean(all_market_prices, axis=0)
-    overall_avg_market_price = np.mean(avg_market_prices)
-    st.write(f"Gemiddelde Marktprijs na Monte Carlo Simulatie: {overall_avg_market_price:.2f}")
-
-    # Plot de marktprijzen
-    st.subheader("Marktprijs Ontwikkeling over Iteraties")
-    fig, ax = plt.subplots()
-    for i, market_prices in enumerate(all_market_prices):
-        ax.plot(market_prices, label=f'Run {i+1}')
-    ax.set_xlabel('Iteratie (Dag)')
-    ax.set_ylabel('Marktprijs')
-    ax.set_title('Marktprijs Ontwikkeling over Iteraties')
-    ax.legend()
-    st.pyplot(fig)
-
-    # Toon voorbeeldresultaten
-    st.subheader("Voorbeeld Resultaten")
-    sample_results = results[:10]
-    for result in sample_results:
-        st.write(f"{result['user_name']} heeft {result['tokens']} tokens en een balans van {result['balance']} euros. (ID: {result['user_id']})")
-
-    # Verdere inzichten
-    st.subheader("Verdere Inzichten")
-    total_tokens_in_market = sum(user['tokens'] for user in results)
-    avg_balance_per_user = np.mean([user['balance'] for user in results])
-    st.write(f"Totaal aantal tokens in de markt: {total_tokens_in_market}")
-    st.write(f"Gemiddelde balans per gebruiker: {avg_balance_per_user:.2f} euros")
+    # Bekijk het aantal tokens van de gebruikers
+    st.write(f"{user1.user_id} heeft {user1.token_count()} tokens.")
+    st.write(f"{user2.user_id} heeft {user2.token_count()} tokens.")
+    st.write(f"{user3.user_id} heeft {user3.token_count()} tokens.")
