@@ -1,5 +1,6 @@
 import random
 import math
+import numpy as np
 import streamlit as st
 
 # Token: Een klasse die een enkel token voorstelt.
@@ -12,7 +13,7 @@ class Token:
 
 # 2. User: Een klasse die een gebruiker voorstelt die tokens kan ontvangen én betalen, met een utility curve.
 class User:
-    def __init__(self, user_id, balance=10, activity_desire = 5):
+    def __init__(self, user_id, balance=10, activity_desire=5):
         self.user_id = user_id
         self.tokens = []
         self.balance = balance
@@ -63,9 +64,9 @@ class Market:
 
     def update_price(self):
         if self.demand > self.supply:
-            self.price *= (1 + self.elasticity)   # Verhoog de prijs met 10%
+            self.price *= (1 + self.elasticity)   # Verhoog de prijs
         elif self.supply > self.demand:
-            self.price *= (1 - self.elasticity)  # Verlaag de prijs met 10%
+            self.price *= (1 - self.elasticity)  # Verlaag de prijs
         # Reset demand en supply na het aanpassen van de prijs
         self.demand = 0
         self.supply = 0
@@ -182,6 +183,32 @@ def simulate_activity(activity_pool, initial_release, iterations):
         market.adjust_market_price()
         st.write("")
 
+# Monte Carlo Simulatie functie
+def monte_carlo_simulation(num_users, iterations, monte_carlo_runs):
+    """Monte Carlo simulatie voor tokenomics model."""
+    results = []
+    for _ in range(monte_carlo_runs):
+        # Initialiseer gebruikers, token generator, en market
+        users = [User(f"User{i+1}", activity_desire=5) for i in range(num_users)]
+        token_generator = TokenGenerator()
+        market = Market(users)
+        initial_release = InitialRelease(users, token_generator)
+        initial_release.distribute_tokens(10)
+        activity_pool = ActivityPool(users, token_generator, market)
+
+        # Voer de markt simulatie uit
+        simulate_activity(activity_pool, initial_release, iterations)
+
+        # Verzamel de resultaten
+        for user in users:
+            results.append({
+                "user_name": user.user_id,
+                "tokens": user.token_count(),
+                "balance": user.balance,
+                "final_utility": user.activity_utility()
+            })
+    return results
+
 # Streamlit interface
 st.title("Tokenomics Simulatie")
 
@@ -189,6 +216,7 @@ num_users = st.slider("Aantal gebruikers", 1, 50, 3)
 elasticity = st.slider("Elasticiteit", 0.0, 1.0, 0.1)
 probability = st.slider("Waarschijnlijkheid van activiteitspool", 0.0, 1.0, 0.4)
 iterations = st.slider("Aantal iteraties", 1, 50, 10)
+monte_carlo_runs = st.slider("Aantal Monte Carlo simulaties", 1, 500, 100)
 
 if st.button("Voer Simulatie Uit"):
     with st.spinner("Simulatie wordt uitgevoerd..."):
@@ -213,3 +241,17 @@ if st.button("Voer Simulatie Uit"):
         # Bekijk het aantal tokens van de gebruikers
         for user in users:
             st.write(f"{user.user_id} heeft {user.token_count()} tokens en {user.balance} balance.")
+
+if st.button("Start Monte Carlo Simulatie"):
+    with st.spinner("Monte Carlo simulatie wordt uitgevoerd..."):
+        # Voer de Monte Carlo simulatie uit
+        results = monte_carlo_simulation(num_users, iterations, monte_carlo_runs)
+        
+        # Bereken de gemiddelde final utility
+        average_utility = np.mean([result["final_utility"] for result in results])
+        st.write(f"Gemiddelde uiteindelijke utility na Monte Carlo simulatie: {average_utility:.2f}")
+    
+        # Toon een steekproef van de resultaten
+        sample_results = results[:num_users]
+        for result in sample_results:
+            st.write(f"{result['user_name']} heeft {result['tokens']} tokens en een balans van {result['balance']} euro.")
