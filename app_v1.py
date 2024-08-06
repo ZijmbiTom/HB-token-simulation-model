@@ -2,6 +2,19 @@ import random
 import math
 import streamlit as st
 import matplotlib.pyplot as plt
+import os
+
+# We maken ons eigen print statement want we wisselen tussen de streamlit applicatie en de simulatie hier in python
+os.environ['USE_STREAMLIT'] = 'False'  # Verander deze waarde indien nodig
+
+# Controleer de omgevingsvariabele om te bepalen of streamlit moet worden gebruikt
+USE_STREAMLIT = os.environ.get('USE_STREAMLIT', 'False') == 'True'
+
+def write_output(message):
+    if USE_STREAMLIT:
+        st.write(message)
+    else:
+        print(message)
 
 # Token: Een klasse die een enkel token voorstelt.
 class Token: 
@@ -13,11 +26,11 @@ class Token:
 
 # User: Een klasse die een gebruiker voorstelt die tokens kan ontvangen én betalen, met een utility curve.
 class User:
-    def __init__(self, user_id, balance=10, activity_desire=5):
+    def __init__(self, user_id, balance=None, activity_desire=None):
         self.user_id = user_id
         self.tokens = []
-        self.balance = balance
-        self.activity_desire = activity_desire
+        self.balance = balance if balance is not None else random.normalvariate(10,2)
+        self.activity_desire = activity_desire if activity_desire is not None else random.normalvariate(5,1)
         
     def receive_tokens(self, token):
         self.tokens.append(token)
@@ -35,6 +48,12 @@ class User:
     def activity_utility(self):
         return self.activity_desire * math.log(1 + 1 * self.token_count() * 2 * self.balance)
 
+    def buy_utility(self, market_price):
+        return (self.balance / market_price) * (1 / self.activity_desire)
+
+    def sell_utility(self, market_price):
+        return self.token_count() * market_price * (1 / self.activity_desire)
+    
     def __repr__(self):
         return f"User({self.user_id}, Tokens: {self.tokens})"
 
@@ -68,21 +87,23 @@ class TokenGenerator:
         
 # De Market klasse beheert het kopen en verkopen van tokens tussen gebruikers.
 class Market:
-    def __init__(self, users, initial_price=1.0, elasticity=0.05):
+    def __init__(self, users, initial_price=1.0, elasticity=0.05, buy_threshold = 2.0, sell_threshold = 2.0):
         self.users = users
         self.price = initial_price
         self.demand = 0
         self.supply = 0
         self.elasticity = elasticity
+        self.buy_threshold = buy_threshold
+        self.sell_threshold = sell_threshold
 
     def update_price(self):
-        if self.demand > self.supply:
-            self.price *= (1 + self.elasticity)   # Verhoog de prijs met 10%
-        elif self.supply > self.demand:
-            self.price *= (1 - self.elasticity)  # Verlaag de prijs met 10%
-        # Reset demand en supply na het aanpassen van de prijs
-        self.demand = 0
-        self.supply = 0
+            if self.demand > self.supply:
+                self.price *= (1 + self.elasticity)
+            elif self.supply > self.demand:
+                self.price *= (1 - self.elasticity)
+            # Reset demand en supply na het aanpassen van de prijs
+            self.demand = 0
+            self.supply = 0
 
     def buy_token(self, buyer):
         sellers = self.users[:]
@@ -95,8 +116,8 @@ class Market:
                         buyer.receive_tokens(token[0])
                         buyer.balance -= self.price
                         seller.balance += self.price
-                        st.write(f"{buyer.user_id} heeft een token gekocht van {seller.user_id} voor {self.price:.2f} euro.")
-                        self.demand += 1
+                        write_output(f"{buyer.user_id} heeft een token gekocht van {seller.user_id} voor {self.price:.2f} euro.")
+                        self.demand += 2
                         self.supply -= 1
                         return True, "Success"
                 else:
@@ -111,64 +132,82 @@ class Market:
                     buyer.receive_tokens(token[0])
                     buyer.balance -= self.price
                     seller.balance += self.price
-                    st.write(f"{seller.user_id} heeft een token verkocht aan {buyer.user_id} voor {self.price:.2f} euro.")
+                    write_output(f"{seller.user_id} heeft een token verkocht aan {buyer.user_id} voor {self.price:.2f} euro.")
                     self.demand -= 1
-                    self.supply += 1
+                    self.supply += 2
                     return True, "Success"
         return False, "Geen kopers beschikbaar voor de tokens."
 
+    def trade_tokens(self):
+            # Let each user attempt to buy or sell based on their utilities
+            for buyer in self.users:
+                buyer_buy_utility = buyer.buy_utility(self.price)
+                if buyer_buy_utility > self.buy_threshold:
+                    # Find a seller with high enough sell utility
+                    for seller in self.users:
+                        seller_sell_utility = seller.sell_utility(self.price)
+                        if seller != buyer and seller_sell_utility > self.sell_threshold and seller_sell_utility > buyer_buy_utility:
+                            # Attempt to buy from this seller
+                            success, message = self.buy_token(buyer)
+                            if success:
+                                write_output(f"{buyer.user_id} heeft tokens gekocht van {seller.user_id} vanwege hoge buy utility.")
+                                break  # Break after successful purchase
+                            else:
+                                write_output(f"{buyer.user_id} kon geen tokens kopen. Reden: {message}")
+
     def adjust_market_price(self):
         self.update_price()
-        st.write(f"De nieuwe marktprijs voor tokens is {self.price:.2f} euro.")
+        write_output(f"De nieuwe marktprijs voor tokens is {self.price:.2f} euro.")
     
 # Activity Pool: X% kans dat bij deelname je een token krijgt, je kan elke iteratie deelnemen als user        
 class ActivityPool:
-    def __init__(self, users, token_generator, market, probability=0.4, activity_price=2, received_tokens=5, utility_threshold=10):
+    def __init__(self, users, token_generator, market, probability=0.4, activity_price=None, received_tokens=None, utility_threshold=None):
         self.users = users
         self.token_generator = token_generator
         self.market = market
         self.probability = probability
-        self.activity_price = activity_price
-        self.received_tokens = received_tokens
-        self.utility_threshold = utility_threshold
+        self.activity_price = activity_price if activity_price is not None else random.randint(1,3)
+        self.received_tokens = received_tokens if received_tokens is not None else random.randint(3,6)
+        self.utility_threshold = utility_threshold if utility_threshold is not None else random.normalvariate(5,1)
 
     def assign_tokens(self, user):
         tokens_paid = user.pay_token(num_tokens=self.activity_price)
         if tokens_paid:
-            st.write(f"{user.user_id} heeft {self.activity_price} token(s) betaald.")
+            write_output(f"{user.user_id} heeft {self.activity_price} token(s) betaald.")
             if random.random() < self.probability:
                 self.token_generator.assign_token_to_user(user, num_tokens=self.received_tokens)
-                st.write(f"{user.user_id} heeft {self.received_tokens} token(s) gekregen.")
+                write_output(f"{user.user_id} heeft {self.received_tokens} token(s) gekregen.")
             else:
-                st.write(f"{user.user_id} heeft geen tokens gekregen.")
+                write_output(f"{user.user_id} heeft geen tokens gekregen.")
         else:
-            st.write(f"{user.user_id} heeft niet genoeg tokens om deel te nemen.")
+            write_output(f"{user.user_id} heeft niet genoeg tokens om deel te nemen.")
             # Probeer een token te kopen van een andere gebruiker
             success, message = self.market.buy_token(user)
             if success:
-                st.write(f"{user.user_id} heeft een token gekocht om deel te nemen.")
+                write_output(f"{user.user_id} heeft een token gekocht om deel te nemen.")
                 self.assign_tokens(user)
             else:
-                st.write(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
+                write_output(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
 
     def participate(self, user):
-        if user.activity_utility() < self.utility_threshold:
-            st.write(f"{user.user_id} heeft besloten niet deel te nemen vanwege lage utility.")
-            # Probeer een token te kopen van een andere gebruiker
-            success, message = self.market.buy_token(user)
-            if success:
-                st.write(f"{user.user_id} heeft een token gekocht om zijn utility te verhogen.")
-                # Herbereken de utility na het kopen van de token
-                if user.activity_utility() >= self.utility_threshold:
-                    st.write(f"{user.user_id} heeft nu genoeg utility om deel te nemen.")
+        # Controleer of de gebruiker genoeg utility heeft om deel te nemen
+        if user.activity_utility() >= self.utility_threshold:
+            # Controleer of de gebruiker genoeg tokens heeft om deel te nemen
+            if user.token_count() >= self.activity_price:
+                # Gebruiker heeft genoeg utility en tokens, dus neemt deel
+                self.assign_tokens(user)
+            else:
+                # Gebruiker heeft niet genoeg tokens, probeer tokens te kopen
+                success, message = self.market.buy_token(user)
+                if success:
+                    write_output(f"{user.user_id} heeft een token gekocht om deel te nemen.")
+                    # Herbereken de utility na het kopen van de token (hoewel niet nodig voor deelname)
                     self.assign_tokens(user)
                 else:
-                    st.write(f"{user.user_id} heeft nog steeds een te lage utility om deel te nemen.")
-            else:
-                st.write(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
+                    write_output(f"{user.user_id} kon geen token kopen om deel te nemen. Reden: {message}")
         else:
-            self.assign_tokens(user)     
-    
+            write_output(f"{user.user_id} heeft besloten niet deel te nemen vanwege lage utility.")
+     
 # Initial Release class: 
 class InitialRelease:
     def __init__(self, users, token_generator):
@@ -179,7 +218,7 @@ class InitialRelease:
         for _ in range(num_tokens):
             user = random.choice(self.users) # voeg de num_tokens op een random manier toe
             self.token_generator.assign_token_to_user(user)
-        st.write(f"Inital release of {num_tokens} tokens completed.")        
+        write_output(f"Inital release of {num_tokens} tokens completed.")        
         
 # Functie om gebruikers aan te maken
 def create_users(num_friends_family, num_team_advisors, num_general):
@@ -290,3 +329,77 @@ if st.button("Start simulatie"):
         ax.set_title('Utility Ontwikkeling per User over Iteraties')
         ax.legend(prop={'size': 6})
         st.pyplot(fig)
+
+# Simulatie functie
+def simulate_activity(activity_pool, initial_release, market, iterations):
+    # Algemene informatie
+    write_output("Algemene Informatie:")
+    write_output(f"- Activity Threshold: {activity_pool.utility_threshold:.2f}")
+    write_output(f"- Buy Threshold: {market.buy_threshold:.2f}")
+    write_output(f"- Sell Threshold: {market.sell_threshold:.2f}")
+    write_output("")  # Lege regel voor leesbaarheid
+    
+    # Basisinformatie van de users
+    for user in activity_pool.users:  # Gebruik bestaande activity_pool gebruikers
+        write_output(f"Basisinformatie voor {user.user_id}:")
+        write_output(f"- Balance: {user.balance:.2f}")
+        write_output(f"- Aantal tokens: {user.token_count()}")
+        write_output(f"- Activity Desire: {user.activity_desire:.2f}")
+        write_output(f"- Activity Utility: {user.activity_utility():.2f}")
+        write_output(f"- Buy Utility: {user.buy_utility(market.price):.2f}")  # Geef de marktprijs door
+        write_output(f"- Sell Utility: {user.sell_utility(market.price):.2f}")  # Geef de marktprijs door
+        write_output("")  # Lege regel voor leesbaarheid
+    
+    for i in range(iterations):
+        write_output(f"--- Iteratie {i+1} ---")
+        write_output(f"Huidige marktprijs: {market.price:.2f}\n")
+
+        # Laat gebruikers eerst tokens kopen/verkopen op basis van utilities
+        market.trade_tokens()
+
+        for user in activity_pool.users:
+            write_output(f"{user.user_id} heeft {user.token_count()} tokens.")
+            write_output(f"{user.user_id} heeft {user.balance:.2f} balance.")
+            write_output(f"{user.user_id} heeft {user.activity_utility():.2f} utility.")
+            write_output(f"{user.user_id} Buy Utility: {user.buy_utility(market.price):.2f}")  # Geef de marktprijs door
+            write_output(f"{user.user_id} Sell Utility: {user.sell_utility(market.price):.2f}")  # Geef de marktprijs door
+            # Laat gebruiker deelnemen en print de resultaten via write_output
+            activity_pool.participate(user)
+            write_output("")  # Een lege regel voor leesbaarheid
+
+        # Pas de marktprijs aan en print het resultaat
+        market.adjust_market_price()
+        write_output(f"Nieuwe marktprijs: {market.price:.2f}")
+
+        # Print vraag en aanbod na elke iteratie
+        write_output(f"Vraag naar tokens: {market.demand}")
+        write_output(f"Aanbod van tokens: {market.supply}\n")
+
+    write_output("Simulatie voltooid.")
+
+# Voorbeeld van het aanroepen van de simulatiefunctie
+def main_simulation():
+    # Maak gebruikers aan
+    users = create_users(num_friends_family=1, num_team_advisors=1, num_general=2)
+    
+    # Maak een token generator
+    token_generator = TokenGenerator()
+    
+    # Maak een markt aan met default elasticiteit
+    market = Market(users, initial_price=1.0, elasticity=0.05)
+    
+    # Maak een InitialRelease en verdeel tokens
+    initial_release = InitialRelease(users, token_generator)
+    initial_release.distribute_tokens(50)  
+    
+    # Maak een ActivityPool aan met default parameters
+    activity_pool = ActivityPool(users, token_generator, market, probability=0.2)
+    
+    # Voer de simulatie uit voor 10 iteraties
+    simulate_activity(activity_pool, initial_release, market, iterations=5)
+
+# Roep de main_simulation functie aan om de simulatie te starten
+main_simulation()
+
+
+   
