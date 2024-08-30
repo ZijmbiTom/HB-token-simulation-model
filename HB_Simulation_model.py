@@ -29,7 +29,7 @@ aantal_gebruikers = st.sidebar.number_input("Aantal gebruikers", value=1000)
 groeiratio_gebruiker = st.sidebar.number_input("Groeipercentage gebruikers per dag", value=1)
 aantal_speculators = st.sidebar.number_input("Aantal speculators", value=1000)
 groeiratio_speculators = st.sidebar.number_input("Groeipercentage speculators per dag", value=1)
-iterations = st.sidebar.number_input("Iterations", value=1000)
+iterations = st.sidebar.number_input("Iterations", value=10)
 
 # Configuratie klasse
 class Configuratie:
@@ -161,6 +161,12 @@ class Speculator(User):
     def bepaal_aantal_tokens_om_te_handelen(self, token):
         koop_utility = self.koop_utility(token)
         verkoop_utility = self.verkoop_utility(token)
+
+        # Definieer een drempelwaarde voor een klein verschil
+        drempel = 0.0001  # Kleine waarde
+    
+        if abs(koop_utility - verkoop_utility) < drempel:
+            return 0  # Het verschil is te klein, dus geen tokens verhandelen
 
         if koop_utility > verkoop_utility:
             # Bereken hoeveel tokens nodig zijn om het verschil te overbruggen

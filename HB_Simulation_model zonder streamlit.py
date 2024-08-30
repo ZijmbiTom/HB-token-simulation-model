@@ -24,7 +24,7 @@ class Configuratie:
         self.pool_fee = 10000
         self.aantal_gebruiker = 1000
         self.aantal_speculators = 1000
-        self.iterations = 10
+        self.iterations = 100
         self.groeiratio_gebruiker = 1 / 100  # Omdat de input is in percentages
         self.groeiratio_speculators = 1 / 100  # Omdat de input is in percentages
 
@@ -141,6 +141,12 @@ class Speculator(User):
     def bepaal_aantal_tokens_om_te_handelen(self, token):
         koop_utility = self.koop_utility(token)
         verkoop_utility = self.verkoop_utility(token)
+
+        # Definieer een drempelwaarde voor een klein verschil
+        drempel = 0.0001  # Dit kun je aanpassen naar behoefte
+    
+        if abs(koop_utility - verkoop_utility) < drempel:
+            return 0  # Het verschil is te klein, dus geen tokens verhandelen
 
         if koop_utility > verkoop_utility:
             # Bereken hoeveel tokens nodig zijn om het verschil te overbruggen
