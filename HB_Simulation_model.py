@@ -731,7 +731,6 @@ if st.button("Start Simulatie"):
         vrijgave_per_iteratie["Ecosystem"].append(Eco.vrijgave_per_iteratie[-1])
         vrijgave_per_iteratie["Liquidity"].append(liquidity.vrijgave_per_iteratie[-1])
 
-
         exchange.voeg_tokens_toe(PSA, PSA.beschikbare_vrijgegeven_tokens, token)
         exchange.voeg_tokens_toe(FaF, FaF.beschikbare_vrijgegeven_tokens * 0.01, token)
         exchange.voeg_tokens_toe(TaA, TaA.beschikbare_vrijgegeven_tokens * 0.01, token)
@@ -749,15 +748,14 @@ if st.button("Start Simulatie"):
             gebruikers.append(gebruiker)
 
         # Utilities bijhouden
-        gebruiker_utilities_iteratie = [gebruiker.aciviteit_utility() for gebruiker in gebruikers]
+        gebruiker_utilities_iteratie = [gebruiker.aciviteit_utility(token) for gebruiker in gebruikers]
         gebruiker_utilities.append(sum(gebruiker_utilities_iteratie) / len(gebruikers))  # Gemiddelde utility van alle gebruikers
 
-        speculator_koop_utilities_iteratie = [spec.koop_utility() for spec in specs]
-        speculator_verkoop_utilities_iteratie = [spec.verkoop_utility() for spec in specs]
+        speculator_koop_utilities_iteratie = [spec.koop_utility(token) for spec in specs]
+        speculator_verkoop_utilities_iteratie = [spec.verkoop_utility(token) for spec in specs]
 
         speculator_koop_utilities.append(sum(speculator_koop_utilities_iteratie) / len(specs))  # Gemiddelde koop utility van alle speculators
         speculator_verkoop_utilities.append(sum(speculator_verkoop_utilities_iteratie) / len(specs))  # Gemiddelde verkoop utility van alle speculators
-
 
         for gebruiker in gebruikers:
             activiteit = random.choice(activiteiten)
@@ -769,10 +767,10 @@ if st.button("Start Simulatie"):
                 activiteit.deelname_activiteit(token, exchange, gebruiker, Min)
             elif isinstance(activiteit, DataPool):
                 activiteit.setup_activiteit(DP, token, hb, exchange)
-                activiteit.deelname_activiteit(gebruiker, DP)
+                activiteit.deelname_activiteit(token, exchange, gebruiker, DP)
             elif isinstance(activiteit, HostActiviteit):
                 activiteit.setup_activiteit(Bra, token, hb, exchange)
-                activiteit.deelname_activiteit(gebruiker, Bra)
+                activiteit.deelname_activiteit(token, exchange, gebruiker, Bra)
 
         # Groeimodel voor speculators
         nieuw_aantal_speculators = int(len(specs) * (1 + config.groeiratio_speculators ))
@@ -780,15 +778,13 @@ if st.button("Start Simulatie"):
 
         for i in range(extra_speculators):
             spec = Speculator(id, cash=config.initial_cash_speculator)
-            specs.append(spec)
-
-        #st.write(f"Iteratie {iteratie + 1}: Aantal speculators is gegroeid naar {len(specs)}")
+            specs.append(spec)        
 
         for spec in specs:
-            handelbare_tokens = spec.bepaal_aantal_tokens_om_te_handelen()
-            if spec.koop_utility() > spec.verkoop_utility():
+            handelbare_tokens = spec.bepaal_aantal_tokens_om_te_handelen(token)
+            if spec.koop_utility(token) > spec.verkoop_utility(token):
                 spec.koop_tokens(exchange, handelbare_tokens)
-            elif spec.verkoop_utility() > spec.koop_utility():
+            elif spec.verkoop_utility(token) > spec.koop_utility(token):
                 spec.verkoop_tokens(exchange, handelbare_tokens)
 
         exchange.update_marktprijs()
