@@ -710,6 +710,14 @@ if st.button("Start Simulatie"):
         "Liquidity": []
     }
 
+    activiteiten_utilities = {
+        "Standaard": [],
+        "Burning": [],
+        "Mining": [],
+        "Datapool": [],
+        "Sponsored": []
+    }
+
     gebruiker_utilities = []
     speculator_koop_utilities = []
     speculator_verkoop_utilities = []
@@ -738,10 +746,8 @@ if st.button("Start Simulatie"):
         exchange.voeg_tokens_toe(Eco, Eco.beschikbare_vrijgegeven_tokens * 0.005, token)
 
         # Groeimodel voor gebruikers
-        nieuw_aantal_gebruikers = int(len(gebruikers) * (1 + config.groeiratio_gebruiker ))
+        nieuw_aantal_gebruikers = int(len(gebruikers) * (1 + config.groeiratio_gebruiker))
         extra_gebruikers = nieuw_aantal_gebruikers - len(gebruikers)
-
-        #st.write(f"Iteratie {iteratie + 1}: Aantal gebruikers is gegroeid naar {len(gebruikers)}")
 
         for i in range(extra_gebruikers):
             gebruiker = Gebruiker(id, cash=config.initial_cash_user, data_utility=75)
@@ -772,13 +778,19 @@ if st.button("Start Simulatie"):
                 activiteit.setup_activiteit(Bra, token, hb, exchange)
                 activiteit.deelname_activiteit(token, exchange, gebruiker, Bra)
 
+        activiteiten_utilities["Standaard"].append(activiteiten[0].bereken_threshold(exchange))
+        activiteiten_utilities["Burning"].append(activiteiten[1].bereken_threshold(exchange))
+        activiteiten_utilities["Mining"].append(activiteiten[2].bereken_threshold(exchange))
+        activiteiten_utilities["Datapool"].append(activiteiten[3].bereken_threshold(exchange))
+        activiteiten_utilities["Sponsored"].append(activiteiten[4].bereken_threshold(exchange))
+
         # Groeimodel voor speculators
-        nieuw_aantal_speculators = int(len(specs) * (1 + config.groeiratio_speculators ))
+        nieuw_aantal_speculators = int(len(specs) * (1 + config.groeiratio_speculators))
         extra_speculators = nieuw_aantal_speculators - len(specs)
 
         for i in range(extra_speculators):
             spec = Speculator(id, cash=config.initial_cash_speculator)
-            specs.append(spec)        
+            specs.append(spec)
 
         for spec in specs:
             handelbare_tokens = spec.bepaal_aantal_tokens_om_te_handelen(token)
@@ -796,10 +808,17 @@ if st.button("Start Simulatie"):
 
     st.line_chart(vrijgave_per_iteratie)
 
-    # Plot de gemiddelde utilities
-    st.line_chart({
+    # Combineer de activiteit utilities en de gemiddelde gebruiker/speculator utilities in één plot
+    combined_utilities = {
+        "Standaard": activiteiten_utilities["Standaard"],
+        "Burning": activiteiten_utilities["Burning"],
+        "Mining": activiteiten_utilities["Mining"],
+        "Datapool": activiteiten_utilities["Datapool"],
+        "Sponsored": activiteiten_utilities["Sponsored"],
         "Gemiddelde Gebruiker Utility": gebruiker_utilities,
         "Gemiddelde Speculator Koop Utility": speculator_koop_utilities,
         "Gemiddelde Speculator Verkoop Utility": speculator_verkoop_utilities
-    })
-    
+    }
+
+    # Gebruik Streamlit's line_chart voor de gecombineerde utilities
+    st.line_chart(combined_utilities)
