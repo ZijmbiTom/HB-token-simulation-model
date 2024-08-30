@@ -26,7 +26,9 @@ initial_cash_brands = st.sidebar.number_input("Initial Cash for Brands", value=1
 setup_fee = st.sidebar.number_input("Setup Fee", value=10000)
 pool_fee = st.sidebar.number_input("Pool Fee", value=10000)
 aantal_gebruikers = st.sidebar.number_input("Aantal gebruikers", value=1000)
+groeiratio_gebruiker = st.sidebar.number_input("Groeipercentage gebruikers per dag", value=1)
 aantal_speculators = st.sidebar.number_input("Aantal speculators", value=1000)
+groeiratio_speculators = st.sidebar.number_input("Groeipercentage speculators per dag", value=1)
 iterations = st.sidebar.number_input("Iterations", value=1000)
 
 # Configuratie klasse
@@ -43,6 +45,8 @@ class Configuratie:
         self.aantal_gebruiker = aantal_gebruikers
         self.aantal_speculators = aantal_speculators
         self.iterations = iterations
+        self.groeiratio_gebruiker = groeiratio_gebruiker / 100  # Omdat de input is in percentages
+        self.groeiratio_speculators = groeiratio_speculators / 100  # Omdat de input is in percentages
 
 class Token:
     '''
@@ -104,16 +108,23 @@ class Gebruiker(User):
     def __init__(self, id, cash, data_utility, random_factor = None):
         super().__init__(id, cash)
         self.data_utility = data_utility
-        self.random_factor = random_factor if random_factor is not None else random.uniform(1, 2)
+        self.random_factor = random_factor if random_factor is not None else random.uniform(1, 3)
         
     def aciviteit_utility(self):    
-        return self.random_factor * math.log(1 + 2 * self.tokens + 1 * self.cash + (self.tokens * token.get_prijs()) ) # we gaan er vanuit dat tokens een grotere invloed hebben op het meedoen van activiteiten
+        value = 1 + 2 * self.tokens + 1 * self.cash + (self.tokens * token.get_prijs())  # Prijs heeft een lichte invloed
+            
+        # Controleer op negatieve waarde (log mag niet negatief zijn)
+        if value <= 0:
+            raise ValueError(f"Waarde voor logaritme is niet positief: {value}")
+         
+        return self.random_factor * math.log(value) # we gaan er vanuit dat tokens een grotere invloed hebben op het meedoen van activiteiten
 
 class Speculator(User):
-    def __init__(self, id, cash, koop_threshold=None, verkoop_threshold=None):
+    def __init__(self, id, cash, koop_threshold=None, verkoop_threshold=None, random_factor=None):
         super().__init__(id, cash)
         self.koop_threshold = koop_threshold if koop_threshold is not None else random.normalvariate(5, 1)
         self.verkoop_threshold = verkoop_threshold if verkoop_threshold is not None else random.normalvariate(5, 1)
+        self.random_factor = random_factor if random_factor is not None else random.uniform(1, 5)
 
     def koop_utility(self, tokens=None, cash=None, prijs=None):
         if tokens is None:
@@ -122,7 +133,14 @@ class Speculator(User):
             cash = self.cash
         if prijs is None:
             prijs = self.tokens * token.get_prijs()
-        return math.log(1 + 1 * tokens + 2 * cash + 0.5 * prijs)  # Prijs heeft een lichte invloed
+        
+        value = 1 + 1 * tokens + 2 * cash + prijs 
+            
+        # Controleer op negatieve waarde (log mag niet negatief zijn)
+        if value <= 0:
+            raise ValueError(f"Waarde voor logaritme is niet positief: {value}")
+        
+        return self.random_factor * math.log(value)  
     
     def verkoop_utility(self, tokens=None, cash=None, prijs=None):
         if tokens is None:
@@ -131,7 +149,14 @@ class Speculator(User):
             cash = self.cash
         if prijs is None:
             prijs = self.tokens * token.get_prijs()
-        return math.log(1 + 2 * tokens + 1 * cash + 0.5 * prijs)  # Prijs heeft een lichte invloed
+            
+        value = 2 * tokens + 1 * cash + prijs 
+            
+        # Controleer op negatieve waarde (log mag niet negatief zijn)
+        if value <= 0:
+            raise ValueError(f"Waarde voor logaritme is niet positief: {value}")
+        
+        return self.random_factor * math.log(value)  
     
     def bepaal_aantal_tokens_om_te_handelen(self):
         koop_utility = self.koop_utility()
@@ -188,7 +213,14 @@ class InvestorGroup:
             self.vrijgave_per_iteratie.append(self.vrijgegeven_tokens)
             
     def verkoop_utility(self, prijs_per_token):
-        return math.log(1 + 2 * self.vrijgegeven_tokens + 1 * prijs_per_token)
+        
+        value = 1 + 2 * self.vrijgegeven_tokens + 1 * prijs_per_token # Prijs heeft een lichte invloed
+            
+        # Controleer op negatieve waarde (log mag niet negatief zijn)
+        if value <= 0:
+            raise ValueError(f"Waarde voor logaritme is niet positief: {value}")
+        
+        return math.log(value)  
 
 class FriendsAndFamily(InvestorGroup):
     '''
@@ -667,6 +699,20 @@ if st.button("Start Simulatie"):
     Min.vrijgave_tokens(iteratie)
     Eco.vrijgave_tokens(iteratie)
     liquidity.vrijgave_tokens(iteratie)
+    
+    # Dictionary om vrijgave van tokens bij te houden per iteratie voor elke groep
+    vrijgave_per_iteratie = {
+        "FriendsAndFamily": [],
+        "TeamAndAdvisors": [],
+        "PublicSaleAirdrop": [],
+        "Mining": [],
+        "Ecosystem": [],
+        "Liquidity": []
+    }
+
+    gebruiker_utilities = []
+    speculator_koop_utilities = []
+    speculator_verkoop_utilities = []
 
     iterations = config.iterations
     for iteratie in range(iterations):
@@ -677,11 +723,41 @@ if st.button("Start Simulatie"):
         Eco.vrijgave_tokens(iteratie)
         liquidity.vrijgave_tokens(iteratie)
 
+        # Vrijgave opslaan in dictionary
+        vrijgave_per_iteratie["FriendsAndFamily"].append(FaF.vrijgave_per_iteratie[-1])
+        vrijgave_per_iteratie["TeamAndAdvisors"].append(TaA.vrijgave_per_iteratie[-1])
+        vrijgave_per_iteratie["PublicSaleAirdrop"].append(PSA.vrijgave_per_iteratie[-1])
+        vrijgave_per_iteratie["Mining"].append(Min.vrijgave_per_iteratie[-1])
+        vrijgave_per_iteratie["Ecosystem"].append(Eco.vrijgave_per_iteratie[-1])
+        vrijgave_per_iteratie["Liquidity"].append(liquidity.vrijgave_per_iteratie[-1])
+
+
         exchange.voeg_tokens_toe(PSA, PSA.beschikbare_vrijgegeven_tokens, token)
         exchange.voeg_tokens_toe(FaF, FaF.beschikbare_vrijgegeven_tokens * 0.01, token)
         exchange.voeg_tokens_toe(TaA, TaA.beschikbare_vrijgegeven_tokens * 0.01, token)
         exchange.voeg_tokens_toe(Min, Min.beschikbare_vrijgegeven_tokens * 0.005, token)
         exchange.voeg_tokens_toe(Eco, Eco.beschikbare_vrijgegeven_tokens * 0.005, token)
+
+        # Groeimodel voor gebruikers
+        nieuw_aantal_gebruikers = int(len(gebruikers) * (1 + config.groeiratio_gebruiker ))
+        extra_gebruikers = nieuw_aantal_gebruikers - len(gebruikers)
+
+        #st.write(f"Iteratie {iteratie + 1}: Aantal gebruikers is gegroeid naar {len(gebruikers)}")
+
+        for i in range(extra_gebruikers):
+            gebruiker = Gebruiker(id, cash=config.initial_cash_user, data_utility=75)
+            gebruikers.append(gebruiker)
+
+        # Utilities bijhouden
+        gebruiker_utilities_iteratie = [gebruiker.aciviteit_utility() for gebruiker in gebruikers]
+        gebruiker_utilities.append(sum(gebruiker_utilities_iteratie) / len(gebruikers))  # Gemiddelde utility van alle gebruikers
+
+        speculator_koop_utilities_iteratie = [spec.koop_utility() for spec in specs]
+        speculator_verkoop_utilities_iteratie = [spec.verkoop_utility() for spec in specs]
+
+        speculator_koop_utilities.append(sum(speculator_koop_utilities_iteratie) / len(specs))  # Gemiddelde koop utility van alle speculators
+        speculator_verkoop_utilities.append(sum(speculator_verkoop_utilities_iteratie) / len(specs))  # Gemiddelde verkoop utility van alle speculators
+
 
         for gebruiker in gebruikers:
             activiteit = random.choice(activiteiten)
@@ -698,6 +774,16 @@ if st.button("Start Simulatie"):
                 activiteit.setup_activiteit(Bra, token, hb, exchange)
                 activiteit.deelname_activiteit(gebruiker, Bra)
 
+        # Groeimodel voor speculators
+        nieuw_aantal_speculators = int(len(specs) * (1 + config.groeiratio_speculators ))
+        extra_speculators = nieuw_aantal_speculators - len(specs)
+
+        for i in range(extra_speculators):
+            spec = Speculator(id, cash=config.initial_cash_speculator)
+            specs.append(spec)
+
+        #st.write(f"Iteratie {iteratie + 1}: Aantal speculators is gegroeid naar {len(specs)}")
+
         for spec in specs:
             handelbare_tokens = spec.bepaal_aantal_tokens_om_te_handelen()
             if spec.koop_utility() > spec.verkoop_utility():
@@ -712,7 +798,12 @@ if st.button("Start Simulatie"):
     st.write(f"Totale Circulerende Tokens: {token.get_circulerende_tokens()}")
     st.write(f"Totaal aantal tokens op de markt: {exchange.tokens_op_markt}")
 
-    st.line_chart(FaF.vrijgave_per_iteratie)
+    st.line_chart(vrijgave_per_iteratie)
 
-
+    # Plot de gemiddelde utilities
+    st.line_chart({
+        "Gemiddelde Gebruiker Utility": gebruiker_utilities,
+        "Gemiddelde Speculator Koop Utility": speculator_koop_utilities,
+        "Gemiddelde Speculator Verkoop Utility": speculator_verkoop_utilities
+    })
     
