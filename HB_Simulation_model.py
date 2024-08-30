@@ -723,7 +723,13 @@ if st.button("Start Simulatie"):
     speculator_verkoop_utilities = []
 
     iterations = config.iterations
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
     for iteratie in range(iterations):
+        status_text.text(f"Iteratie {iteratie + 1} van {iterations} is bezig...")
+        progress_bar.progress((iteratie + 1) / iterations)
+
         FaF.vrijgave_tokens(iteratie)
         TaA.vrijgave_tokens(iteratie)
         PSA.vrijgave_tokens(iteratie)
@@ -801,24 +807,35 @@ if st.button("Start Simulatie"):
 
         exchange.update_marktprijs()
 
-    st.write("Simulatie succesvol!")
+    status_text.text("Simulatie voltooid!")
+    progress_bar.progress(1.0)
+
     st.write(f"Finale Marktprijs: {token.get_prijs()}")
     st.write(f"Totale Circulerende Tokens: {token.get_circulerende_tokens()}")
     st.write(f"Totaal aantal tokens op de markt: {exchange.tokens_op_markt}")
 
     st.line_chart(vrijgave_per_iteratie)
 
-    # Combineer de activiteit utilities en de gemiddelde gebruiker/speculator utilities in één plot
-    combined_utilities = {
-        "Standaard": activiteiten_utilities["Standaard"],
-        "Burning": activiteiten_utilities["Burning"],
-        "Mining": activiteiten_utilities["Mining"],
-        "Datapool": activiteiten_utilities["Datapool"],
-        "Sponsored": activiteiten_utilities["Sponsored"],
-        "Gemiddelde Gebruiker Utility": gebruiker_utilities,
-        "Gemiddelde Speculator Koop Utility": speculator_koop_utilities,
-        "Gemiddelde Speculator Verkoop Utility": speculator_verkoop_utilities
-    }
-
-    # Gebruik Streamlit's line_chart voor de gecombineerde utilities
-    st.line_chart(combined_utilities)
+   # Maak de matplotlib-plot met stippellijnen voor activiteit utilities
+    plt.figure(figsize=(10, 6))
+    
+    # Plot de activiteit utilities met stippellijnen
+    plt.plot(activiteiten_utilities["Standaard"], label="Standaard", linestyle='--')
+    plt.plot(activiteiten_utilities["Burning"], label="Burning", linestyle='--')
+    plt.plot(activiteiten_utilities["Mining"], label="Mining", linestyle='--')
+    plt.plot(activiteiten_utilities["Datapool"], label="Datapool", linestyle='--')
+    plt.plot(activiteiten_utilities["Sponsored"], label="Sponsored", linestyle='--')
+    
+    # Voeg de gebruiker en speculator utilities toe met doorlopende lijnen
+    plt.plot(gebruiker_utilities, label="Gemiddelde Gebruiker Utility")
+    plt.plot(speculator_koop_utilities, label="Gemiddelde Speculator Koop Utility")
+    plt.plot(speculator_verkoop_utilities, label="Gemiddelde Speculator Verkoop Utility")
+    
+    # Voeg labels, titel en legenda toe
+    plt.xlabel("Iteraties")
+    plt.ylabel("Utility")
+    plt.title("Ontwikkeling van Utilities per Iteratie")
+    plt.legend()
+    
+    # Toon de plot in Streamlit
+    st.pyplot(plt)
