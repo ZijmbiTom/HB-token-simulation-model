@@ -115,7 +115,7 @@ class Gebruiker(User):
             
         # Controleer op negatieve waarde (log mag niet negatief zijn)
         if value <= 0:
-            raise ValueError(f"Waarde voor logaritme is niet positief: {value}")
+           value = 1
          
         return self.random_factor * math.log(value) # we gaan er vanuit dat tokens een grotere invloed hebben op het meedoen van activiteiten
 
@@ -138,7 +138,7 @@ class Speculator(User):
             
         # Controleer op negatieve waarde (log mag niet negatief zijn)
         if value <= 0:
-            raise ValueError(f"Waarde voor logaritme is niet positief: {value}")
+            value = 1
         
         return self.random_factor * math.log(value)  
     
@@ -150,11 +150,11 @@ class Speculator(User):
         if prijs is None:
             prijs = self.tokens * token.get_prijs()
             
-        value = 2 * tokens + 1 * cash + prijs 
+        value = 1 + 2 * tokens + 1 * cash + prijs 
             
         # Controleer op negatieve waarde (log mag niet negatief zijn)
         if value <= 0:
-            raise ValueError(f"Waarde voor logaritme is niet positief: {value}")
+            value = 1
         
         return self.random_factor * math.log(value)  
     
@@ -793,7 +793,7 @@ if st.button("Start Simulatie"):
 
         exchange.update_marktprijs()
 
-    st.write("Simulatie voltooid!")
+    st.write("Simulatie succesvol!")
     st.write(f"Finale Marktprijs: {token.get_prijs()}")
     st.write(f"Totale Circulerende Tokens: {token.get_circulerende_tokens()}")
     st.write(f"Totaal aantal tokens op de markt: {exchange.tokens_op_markt}")
