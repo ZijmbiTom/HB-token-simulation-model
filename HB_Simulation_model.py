@@ -825,7 +825,9 @@ if st.button("Start Simulatie"):
     st.write(f"Finale Marktprijs: {token.get_prijs()}")
     st.write(f"Totale Circulerende Tokens: {token.get_circulerende_tokens()}")
     st.write(f"Totaal aantal tokens op de markt: {exchange.tokens_op_markt}")
-
+    st.write(f"Totaal aantal geburnde tokens: {hb.totale_burned_tokens}")
+    st.write(f"Totaal aantal tokens HB: {hb.tokens}") 
+    
     st.line_chart(vrijgave_per_iteratie)
 
    # Maak de matplotlib-plot met stippellijnen voor activiteit utilities

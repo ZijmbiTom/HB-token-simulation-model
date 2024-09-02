@@ -796,6 +796,8 @@ def run_simulatie():
     print(f"Finale Marktprijs: {token.get_prijs()}")
     print(f"Totale Circulerende Tokens: {token.get_circulerende_tokens()}")
     print(f"Totaal aantal tokens op de markt: {exchange.tokens_op_markt}")
+    print(f"Totaal aantal geburnde tokens: {hb.totale_burned_tokens}")
+    print(f"Totaal aantal tokens HB: {hb.tokens}") 
 
     plt.plot(FaF.vrijgave_per_iteratie, label="FriendsAndFamily")
     plt.plot(TaA.vrijgave_per_iteratie, label="TeamAndAdvisors")
