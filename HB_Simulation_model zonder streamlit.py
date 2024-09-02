@@ -22,11 +22,13 @@ class Configuratie:
         self.initial_cash_brands = 10000
         self.setup_fee = 10000
         self.pool_fee = 10000
-        self.aantal_gebruiker = 1000
-        self.aantal_speculators = 1000
-        self.iterations = 100
+        self.aantal_gebruiker = 3000
+        self.aantal_speculators = 3000
+        self.iterations = 1000
         self.groeiratio_gebruiker = 1 / 100  # Omdat de input is in percentages
         self.groeiratio_speculators = 1 / 100  # Omdat de input is in percentages
+        self.ratio_op_de_markt_investeerders = 1 / 100 # Omdat de input is in percentages
+        self.ratio_op_de_markt_systemen = 0.5 / 100 # Omdat de input is in percentages
 
 class Token:
     '''
@@ -119,7 +121,7 @@ class Speculator(User):
         # Controleer op negatieve waarde (log mag niet negatief zijn)
         if value <= 0:
             value = 1
-        
+
         return self.random_factor * math.log(value)  
     
     def verkoop_utility(self, token, tokens=None, cash=None, prijs=None):
@@ -143,7 +145,7 @@ class Speculator(User):
         verkoop_utility = self.verkoop_utility(token)
 
         # Definieer een drempelwaarde voor een klein verschil
-        drempel = 0.0001  # Dit kun je aanpassen naar behoefte
+        drempel = 0.01  # Dit kun je aanpassen naar behoefte
     
         if abs(koop_utility - verkoop_utility) < drempel:
             return 0  # Het verschil is te klein, dus geen tokens verhandelen
@@ -727,10 +729,10 @@ def run_simulatie():
         vrijgave_per_iteratie["Liquidity"].append(liquidity.vrijgave_per_iteratie[-1])
     
         exchange.voeg_tokens_toe(PSA, PSA.beschikbare_vrijgegeven_tokens, token)
-        exchange.voeg_tokens_toe(FaF, FaF.beschikbare_vrijgegeven_tokens * 0.01, token)
-        exchange.voeg_tokens_toe(TaA, TaA.beschikbare_vrijgegeven_tokens * 0.01, token)
-        exchange.voeg_tokens_toe(Min, Min.beschikbare_vrijgegeven_tokens * 0.005, token)
-        exchange.voeg_tokens_toe(Eco, Eco.beschikbare_vrijgegeven_tokens * 0.005, token)
+        exchange.voeg_tokens_toe(FaF, FaF.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_investeerders, token)
+        exchange.voeg_tokens_toe(TaA, TaA.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_investeerders, token)
+        exchange.voeg_tokens_toe(Min, Min.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_systemen, token)
+        exchange.voeg_tokens_toe(Eco, Eco.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_systemen, token)
     
         # Groeimodel voor gebruikers
         nieuw_aantal_gebruikers = int(len(gebruikers) * (1 + config.groeiratio_gebruiker ))

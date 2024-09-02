@@ -29,7 +29,10 @@ aantal_gebruikers = st.sidebar.number_input("Aantal gebruikers", value=1000)
 groeiratio_gebruiker = st.sidebar.number_input("Groeipercentage gebruikers per dag", value=1)
 aantal_speculators = st.sidebar.number_input("Aantal speculators", value=1000)
 groeiratio_speculators = st.sidebar.number_input("Groeipercentage speculators per dag", value=1)
-iterations = st.sidebar.number_input("Iterations", value=10)
+ratio_op_de_markt_investeerders = st.sidebar.number_input("Percentage op de markt voor investeerders per dag", value=1)
+ratio_op_de_markt_systemen = st.sidebar.number_input("Percentage op de markt voor systemen per dag", value=0.5)
+kans_activiteit = st.sidebar.number_input("Kans dat een activiteit succesvol wordt afgerond", value=0.9)
+iterations = st.sidebar.number_input("Iterations", value=100)
 
 # Configuratie klasse
 class Configuratie:
@@ -47,6 +50,9 @@ class Configuratie:
         self.iterations = iterations
         self.groeiratio_gebruiker = groeiratio_gebruiker / 100  # Omdat de input is in percentages
         self.groeiratio_speculators = groeiratio_speculators / 100  # Omdat de input is in percentages
+        self.ratio_op_de_markt_investeerders = ratio_op_de_markt_investeerders / 100
+        self.ratio_op_de_markt_systemen = ratio_op_de_markt_systemen / 100
+        self.kans_activiteit = kans_activiteit
 
 class Token:
     '''
@@ -163,7 +169,7 @@ class Speculator(User):
         verkoop_utility = self.verkoop_utility(token)
 
         # Definieer een drempelwaarde voor een klein verschil
-        drempel = 0.0001  # Kleine waarde
+        drempel = 0.01  # Kleine waarde
     
         if abs(koop_utility - verkoop_utility) < drempel:
             return 0  # Het verschil is te klein, dus geen tokens verhandelen
@@ -675,12 +681,12 @@ if st.button("Start Simulatie"):
     DP = DataPartner(config.initial_cash_datapartner)
     Bra = Brand(config.initial_cash_brands)
 
-    StandaardActiviteit1 = StandaardActiviteit(inleg=1000, beloning=1500, probability=0.9, activity_threshold=5)
-    BurningActiviteit1 = BurningActiviteit(inleg=1000, beloning=1500, probability=0.9, activity_threshold=5)
-    MiningActiviteit1 = MiningActiviteit(inleg=1000, beloning=1500, probability=0.9, activity_threshold=5)
+    StandaardActiviteit1 = StandaardActiviteit(inleg=1000, beloning=1500, probability=config.kans_activiteit, activity_threshold=5)
+    BurningActiviteit1 = BurningActiviteit(inleg=1000, beloning=1500, probability=config.kans_activiteit, activity_threshold=5)
+    MiningActiviteit1 = MiningActiviteit(inleg=1000, beloning=1500, probability=config.kans_activiteit, activity_threshold=5)
 
     DataPool1 = DataPool(beloning=5000, probability=1, data_threshold=50, setup_fee=config.setup_fee)
-    HostActiviteit1 = HostActiviteit(beloning=2000, probability=0.8, activity_threshold=10, pool_fee=config.pool_fee)
+    HostActiviteit1 = HostActiviteit(beloning=2000, probability=config.kans_activiteit, activity_threshold=10, pool_fee=config.pool_fee)
 
     activiteiten = [StandaardActiviteit1, BurningActiviteit1, MiningActiviteit1, DataPool1, HostActiviteit1]
 
@@ -752,10 +758,10 @@ if st.button("Start Simulatie"):
         vrijgave_per_iteratie["Liquidity"].append(liquidity.vrijgave_per_iteratie[-1])
 
         exchange.voeg_tokens_toe(PSA, PSA.beschikbare_vrijgegeven_tokens, token)
-        exchange.voeg_tokens_toe(FaF, FaF.beschikbare_vrijgegeven_tokens * 0.01, token)
-        exchange.voeg_tokens_toe(TaA, TaA.beschikbare_vrijgegeven_tokens * 0.01, token)
-        exchange.voeg_tokens_toe(Min, Min.beschikbare_vrijgegeven_tokens * 0.005, token)
-        exchange.voeg_tokens_toe(Eco, Eco.beschikbare_vrijgegeven_tokens * 0.005, token)
+        exchange.voeg_tokens_toe(FaF, FaF.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_investeerders, token)
+        exchange.voeg_tokens_toe(TaA, TaA.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_investeerders, token)
+        exchange.voeg_tokens_toe(Min, Min.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_systemen, token)
+        exchange.voeg_tokens_toe(Eco, Eco.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_systemen, token)
 
         # Groeimodel voor gebruikers
         nieuw_aantal_gebruikers = int(len(gebruikers) * (1 + config.groeiratio_gebruiker))
