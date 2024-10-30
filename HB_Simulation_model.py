@@ -724,13 +724,12 @@ class Exchange:
         # Reset vraag en aanbod voor de volgende iteratie
         self.vraag = 0
         self.aanbod = 0
-  
+            
 # in de simulatie moeten we ook nog een inbouwen dat een gebruiker maar aan 1 activiteit mee kan doen (misschien ook nog toevoegen dat een activiteit x aantal dagen duurt?)        
 
 # start simulatie
-
 # Voeg een knop toe om de simulatie te starten
-def run_simulatie():
+if st.button("Start Simulatie"):
     # Configuratie instellen
     config = Configuratie()
     token = Token(config.total_supply, config.initial_token_price)
@@ -816,106 +815,113 @@ def run_simulatie():
     
     # Hoofd iteratielus voor de simulatie
     iterations = config.iterations
-    for iteratie in range(iterations):
-        # Token vrijgave door de verschillende groepen per iteratie
-        FaF.vrijgave_tokens(iteratie)
-        TaA.vrijgave_tokens(iteratie)
-        PSA.vrijgave_tokens(iteratie)
-        Min.vrijgave_tokens(iteratie)
-        Eco.vrijgave_tokens(iteratie)
-        liquidity.vrijgave_tokens(iteratie)
     
-        # Vrijgave opslaan in dictionary
-        vrijgave_per_iteratie["FriendsAndFamily"].append(FaF.vrijgave_per_iteratie[-1])
-        vrijgave_per_iteratie["TeamAndAdvisors"].append(TaA.vrijgave_per_iteratie[-1])
-        vrijgave_per_iteratie["PublicSaleAirdrop"].append(PSA.vrijgave_per_iteratie[-1])
-        vrijgave_per_iteratie["Mining"].append(Min.vrijgave_per_iteratie[-1])
-        vrijgave_per_iteratie["Ecosystem"].append(Eco.vrijgave_per_iteratie[-1])
-        vrijgave_per_iteratie["Liquidity"].append(liquidity.vrijgave_per_iteratie[-1])
-    
-        # Voeg tokens toe aan de exchange vanuit de verschillende groepen
-        exchange.voeg_tokens_toe(PSA, PSA.beschikbare_vrijgegeven_tokens, token)
-        exchange.voeg_tokens_toe(FaF, FaF.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_investeerders, token)
-        exchange.voeg_tokens_toe(TaA, TaA.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_investeerders, token)
-        exchange.voeg_tokens_toe(Min, Min.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_systemen, token)
-        exchange.voeg_tokens_toe(Eco, Eco.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_systemen, token)
-    
-        # Groeimodel voor gebruikers
-        nieuw_aantal_gebruikers = int(len(gebruikers) * (1 + config.groeiratio_gebruiker))
-        extra_gebruikers = nieuw_aantal_gebruikers - len(gebruikers)
-    
-        # Voeg nieuwe gebruikers toe
-        for i in range(extra_gebruikers):
-            gebruiker = Gebruiker(id, cash=config.initial_cash_user, data_utility=75)
-            gebruikers.append(gebruiker)
-    
-        # Utilities van gebruikers bijhouden
-        gebruiker_utilities_iteratie = [gebruiker.aciviteit_utility(token) for gebruiker in gebruikers]
-        gebruiker_utilities.append(sum(gebruiker_utilities_iteratie) / len(gebruikers))  # Gemiddelde utility van alle gebruikers
-    
-        # Utilities van speculators bijhouden
-        speculator_koop_utilities_iteratie = [spec.koop_utility(token) for spec in specs]
-        speculator_verkoop_utilities_iteratie = [spec.verkoop_utility(token) for spec in specs]
-    
-        speculator_koop_utilities.append(sum(speculator_koop_utilities_iteratie) / len(specs))  # Gemiddelde koop utility van alle speculators
-        speculator_verkoop_utilities.append(sum(speculator_verkoop_utilities_iteratie) / len(specs))  # Gemiddelde verkoop utility van alle speculators
+    # Voeg een progress bar toe
+    progress_bar = st.progress(0)
+    status_text = st.empty()
 
-        # Elke iteratie betalen HostActiviteit en DataPool de setup fee
-        HostActiviteit1.setup_activiteit(Bra, token, hb, exchange)
-        DataPool1.setup_activiteit(DP, token, hb, exchange)
-    
-        # Gebruikers doen mee aan activiteiten
-        for gebruiker in gebruikers:
-            activiteit = random.choice(activiteiten)
-            if isinstance(activiteit, StandaardActiviteit):
-                activiteit.deelname_activiteit(token, exchange, gebruiker, hb)
-            elif isinstance(activiteit, BurningActiviteit):
-                activiteit.deelname_activiteit(token, exchange, gebruiker, Eco)
-            elif isinstance(activiteit, MiningActiviteit):
-                activiteit.deelname_activiteit(token, exchange, gebruiker, Min)
-            elif isinstance(activiteit, DataPool):
-                activiteit.setup_activiteit(DP, token, hb, exchange)
-                activiteit.deelname_activiteit(token, exchange, gebruiker, DP)
-            elif isinstance(activiteit, HostActiviteit):
-                activiteit.setup_activiteit(Bra, token, hb, exchange)
-                activiteit.deelname_activiteit(token, exchange, gebruiker, Bra)
-        
-            # Update de beschikbaarheid van de gebruiker voor de volgende activiteit
-            if gebruiker.days_until_available > 0:
-                gebruiker.days_until_available -= 1
-    
-        # Activiteiten utilities bijhouden
-        activiteiten_utilities["Standaard"].append(activiteiten[0].bereken_threshold(exchange))
-        activiteiten_utilities["Burning"].append(activiteiten[1].bereken_threshold(exchange))
-        activiteiten_utilities["Mining"].append(activiteiten[2].bereken_threshold(exchange))
-        activiteiten_utilities["Datapool"].append(activiteiten[3].bereken_threshold(exchange))
-        activiteiten_utilities["Sponsored"].append(activiteiten[4].bereken_threshold(exchange))
-    
-        # Groeimodel voor speculators
-        nieuw_aantal_speculators = int(len(specs) * (1 + config.groeiratio_speculators))
-        extra_speculators = nieuw_aantal_speculators - len(specs)
-    
-        # Voeg nieuwe speculators toe
-        for i in range(extra_speculators):
-            spec = Speculator(id, cash=config.initial_cash_speculator)
-            specs.append(spec)        
-    
-        # Laat speculators handelen
-        for spec in specs:
-            handelbare_tokens = spec.bepaal_aantal_tokens_om_te_handelen(token)
-            if spec.koop_utility(token) > spec.verkoop_utility(token):
-                spec.koop_tokens(exchange, handelbare_tokens)
-            elif spec.verkoop_utility(token) > spec.koop_utility(token):
-                spec.verkoop_tokens(exchange, handelbare_tokens)
-    
-        # Update de marktprijs
-        exchange.update_marktprijs()
+    for iteratie in range(iterations):
+        status_text.text(f"Iteratie {iteratie + 1} van {iterations} is bezig...")
+        progress_bar.progress((iteratie + 1) / iterations)
+
+         # Token vrijgave door de verschillende groepen per iteratie
+         FaF.vrijgave_tokens(iteratie)
+         TaA.vrijgave_tokens(iteratie)
+         PSA.vrijgave_tokens(iteratie)
+         Min.vrijgave_tokens(iteratie)
+         Eco.vrijgave_tokens(iteratie)
+         liquidity.vrijgave_tokens(iteratie)
+     
+         # Vrijgave opslaan in dictionary
+         vrijgave_per_iteratie["FriendsAndFamily"].append(FaF.vrijgave_per_iteratie[-1])
+         vrijgave_per_iteratie["TeamAndAdvisors"].append(TaA.vrijgave_per_iteratie[-1])
+         vrijgave_per_iteratie["PublicSaleAirdrop"].append(PSA.vrijgave_per_iteratie[-1])
+         vrijgave_per_iteratie["Mining"].append(Min.vrijgave_per_iteratie[-1])
+         vrijgave_per_iteratie["Ecosystem"].append(Eco.vrijgave_per_iteratie[-1])
+         vrijgave_per_iteratie["Liquidity"].append(liquidity.vrijgave_per_iteratie[-1])
+     
+         # Voeg tokens toe aan de exchange vanuit de verschillende groepen
+         exchange.voeg_tokens_toe(PSA, PSA.beschikbare_vrijgegeven_tokens, token)
+         exchange.voeg_tokens_toe(FaF, FaF.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_investeerders, token)
+         exchange.voeg_tokens_toe(TaA, TaA.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_investeerders, token)
+         exchange.voeg_tokens_toe(Min, Min.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_systemen, token)
+         exchange.voeg_tokens_toe(Eco, Eco.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_systemen, token)
+     
+         # Groeimodel voor gebruikers
+         nieuw_aantal_gebruikers = int(len(gebruikers) * (1 + config.groeiratio_gebruiker))
+         extra_gebruikers = nieuw_aantal_gebruikers - len(gebruikers)
+     
+         # Voeg nieuwe gebruikers toe
+         for i in range(extra_gebruikers):
+             gebruiker = Gebruiker(id, cash=config.initial_cash_user, data_utility=75)
+             gebruikers.append(gebruiker)
+     
+         # Utilities van gebruikers bijhouden
+         gebruiker_utilities_iteratie = [gebruiker.aciviteit_utility(token) for gebruiker in gebruikers]
+         gebruiker_utilities.append(sum(gebruiker_utilities_iteratie) / len(gebruikers))  # Gemiddelde utility van alle gebruikers
+     
+         # Utilities van speculators bijhouden
+         speculator_koop_utilities_iteratie = [spec.koop_utility(token) for spec in specs]
+         speculator_verkoop_utilities_iteratie = [spec.verkoop_utility(token) for spec in specs]
+     
+         speculator_koop_utilities.append(sum(speculator_koop_utilities_iteratie) / len(specs))  # Gemiddelde koop utility van alle speculators
+         speculator_verkoop_utilities.append(sum(speculator_verkoop_utilities_iteratie) / len(specs))  # Gemiddelde verkoop utility van alle speculators
+
+         # Elke iteratie betalen HostActiviteit en DataPool de setup fee
+         HostActiviteit1.setup_activiteit(Bra, token, hb, exchange)
+         DataPool1.setup_activiteit(DP, token, hb, exchange)
+     
+         # Gebruikers doen mee aan activiteiten
+         for gebruiker in gebruikers:
+             activiteit = random.choice(activiteiten)
+             if isinstance(activiteit, StandaardActiviteit):
+                 activiteit.deelname_activiteit(token, exchange, gebruiker, hb)
+             elif isinstance(activiteit, BurningActiviteit):
+                 activiteit.deelname_activiteit(token, exchange, gebruiker, Eco)
+             elif isinstance(activiteit, MiningActiviteit):
+                 activiteit.deelname_activiteit(token, exchange, gebruiker, Min)
+             elif isinstance(activiteit, DataPool):
+                 activiteit.setup_activiteit(DP, token, hb, exchange)
+                 activiteit.deelname_activiteit(token, exchange, gebruiker, DP)
+             elif isinstance(activiteit, HostActiviteit):
+                 activiteit.setup_activiteit(Bra, token, hb, exchange)
+                 activiteit.deelname_activiteit(token, exchange, gebruiker, Bra)
+         
+             # Update de beschikbaarheid van de gebruiker voor de volgende activiteit
+             if gebruiker.days_until_available > 0:
+                 gebruiker.days_until_available -= 1
+     
+         # Activiteiten utilities bijhouden
+         activiteiten_utilities["Standaard"].append(activiteiten[0].bereken_threshold(exchange))
+         activiteiten_utilities["Burning"].append(activiteiten[1].bereken_threshold(exchange))
+         activiteiten_utilities["Mining"].append(activiteiten[2].bereken_threshold(exchange))
+         activiteiten_utilities["Datapool"].append(activiteiten[3].bereken_threshold(exchange))
+         activiteiten_utilities["Sponsored"].append(activiteiten[4].bereken_threshold(exchange))
+     
+         # Groeimodel voor speculators
+         nieuw_aantal_speculators = int(len(specs) * (1 + config.groeiratio_speculators))
+         extra_speculators = nieuw_aantal_speculators - len(specs)
+     
+         # Voeg nieuwe speculators toe
+         for i in range(extra_speculators):
+             spec = Speculator(id, cash=config.initial_cash_speculator)
+             specs.append(spec)        
+     
+         # Laat speculators handelen
+         for spec in specs:
+             handelbare_tokens = spec.bepaal_aantal_tokens_om_te_handelen(token)
+             if spec.koop_utility(token) > spec.verkoop_utility(token):
+                 spec.koop_tokens(exchange, handelbare_tokens)
+             elif spec.verkoop_utility(token) > spec.koop_utility(token):
+                 spec.verkoop_tokens(exchange, handelbare_tokens)
+     
+         # Update de marktprijs
+         exchange.update_marktprijs()
 
     status_text.text("Simulatie voltooid!")
     progress_bar.progress(1.0)
 
     st.write(f"Finale Marktprijs: {token.get_prijs()}")
-    st.write(f"Totale Circulerende Tokens: {token.get_circulerende_tokens()}")
     st.write(f"Totaal aantal tokens op de markt: {exchange.tokens_op_markt}")
     st.write(f"Totaal aantal geburnde tokens: {hb.totale_burned_tokens}")
     st.write(f"Totaal aantal tokens HB: {hb.tokens}") 
