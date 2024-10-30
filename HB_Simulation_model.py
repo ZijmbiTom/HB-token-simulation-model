@@ -210,9 +210,6 @@ class InvestorGroup:
         self.verkoop_threshold = verkoop_threshold if verkoop_threshold is not None else random.normalvariate(5,1)
         self.vrijgave_per_iteratie = []
 
-        # Nieuwe variabele die aangeeft of tokens op de markt worden gebracht
-        self.tokens_op_de_markt = False
-
     def vrijgave_tokens(self, iteratie):
         if iteratie == 0:
             # TGE Vrijgave
@@ -243,13 +240,6 @@ class InvestorGroup:
             raise ValueError(f"Waarde voor logaritme is niet positief: {value}")
         
         return math.log(value)  
-
-    def zet_tokens_op_de_markt(self, op_de_markt):
-        """
-        Stelt in of de vrijgegeven tokens op de markt gebracht moeten worden.
-        :param op_de_markt: boolean waarde die aangeeft of de tokens op de markt gebracht moeten worden.
-        """
-        self.tokens_op_de_markt = op_de_markt
 
 class FriendsAndFamily(InvestorGroup):
     '''
@@ -745,12 +735,6 @@ if st.button("Start Simulatie"):
     PSA = PublicSaleAirdrop(config.total_supply, tge_percentage=config.tge_psa)  # Bijvoorbeeld 25% in plaats van 20%
     Min = Mining(config.total_supply)
     Eco = Ecosystem(config.total_supply)
-
-    # Stel in of FriendsAndFamily hun tokens op de markt willen brengen
-    FaF.zet_tokens_op_de_markt(False)  # FriendsAndFamily willen hun tokens niet op de markt brengen
-    
-    # Stel in of TeamAndAdvisors hun tokens op de markt willen brengen
-    TaA.zet_tokens_op_de_markt(False)  # TeamAndAdvisors willen hun tokens niet op de markt brengen
 
     # Initialiseer de datapartners en merken
     DP = DataPartner(config.initial_cash_datapartner)
