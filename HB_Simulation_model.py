@@ -32,8 +32,8 @@ groeiratio_speculators = st.sidebar.number_input("Groeipercentage speculators pe
 ratio_op_de_markt_investeerders = st.sidebar.number_input("Percentage op de markt voor investeerders per maand", value=0)
 ratio_op_de_markt_systemen = st.sidebar.number_input("Percentage op de markt voor systemen per maand", value=0.5)
 kans_activiteit = st.sidebar.number_input("Kans dat een activiteit succesvol wordt afgerond", value=0.9)
-iterations = st.sidebar.number_input("Iterations", value=100)
-tge_psa = st.sidebar.number_input("Percentage Public sale op de markt", value=50)
+iterations = st.sidebar.number_input("Iterations", value=365)
+tge_psa = st.sidebar.number_input("Percentage Public sale op de markt", value=80)
 elasticiteit = st.sidebar.number_input("Gevoeligheid van de prijs verandering (tussen 0 en 1)", value=0.5)
 
 # Configuratie klasse
