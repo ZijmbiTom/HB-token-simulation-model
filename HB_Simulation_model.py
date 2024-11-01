@@ -965,24 +965,36 @@ if st.button("Start Simulatie"):
     status_text.text("Simulatie voltooid!")
     progress_bar.progress(1.0)
 
-    st.write(f"Finale Marktprijs: {token.get_prijs()}")
+    # Bereken de finale marktprijs en de percentuele verandering ten opzichte van de initiële tokenprijs
+    finale_marktprijs = token.get_prijs()
+    initial_price = config.initial_token_price
+    percentuele_verandering = ((finale_marktprijs - initial_price) / initial_price) * 100
+    
+    # Print de eindresultaten
+    st.write(f"Finale Marktprijs: {finale_marktprijs:.6f}")
+    st.write(f"Percentuele Verandering ten opzichte van de Initiële Token Prijs: {percentuele_verandering:.2f}%")
     st.write(f"Totaal aantal tokens op de markt: {exchange.tokens_op_markt}")
     st.write(f"Totaal aantal geburnde tokens: {hb.totale_burned_tokens}")
-    st.write(f"Totaal aantal tokens HB: {hb.tokens}") 
+    st.write(f"Totaal aantal tokens HB: {hb.tokens}")
     
+    # Toon de vrijgave van tokens per iteratie
+    st.write("Vrijgave van Tokens per Iteratie")
     st.line_chart(vrijgave_per_iteratie)
-
+    
     # Toon de marktprijs over tijd in Streamlit
+    st.write("Marktprijs van de Token over Tijd")
     st.line_chart(marktprijs_over_time)
     
     # Toon de beschikbare tokens van de liquidity klasse over tijd
+    st.write("Beschikbare Tokens van de Liquidity Klasse over Tijd")
     st.line_chart(liquidity_tokens_over_time)
     
     # Toon het aantal tokens op de markt per klasse over tijd
     for klasse, tokens_per_iteratie in tokens_op_markt_per_klasse.items():
-        st.line_chart(tokens_per_iteratie, caption=f"Tokens op de markt - {klasse}")
-
-   # Maak de matplotlib-plot met stippellijnen voor activiteit utilities
+        st.write(f"Tokens op de markt - {klasse}")
+        st.line_chart(tokens_per_iteratie)
+    
+    # Maak de matplotlib-plot met stippellijnen voor activiteit utilities
     plt.figure(figsize=(10, 6))
     
     # Plot de activiteit utilities met stippellijnen
