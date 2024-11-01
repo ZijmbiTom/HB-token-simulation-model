@@ -15,28 +15,29 @@ import matplotlib.pyplot as plt
 class Configuratie:
     def __init__(self):
         self.initial_token_price = 0.0001
-        self.total_supply = 50000
+        self.total_supply = 50000000000
         self.initial_cash_user = 1000
         self.initial_cash_speculator = 3000
         self.initial_cash_datapartner = 1000000
         self.initial_cash_brands = 1000000
-        self.setup_fee = 10000
-        self.pool_fee = 10000
-        self.aantal_gebruiker = 5
-        self.aantal_speculators = 2
-        self.iterations = 100
+        self.setup_fee = 20 # in euro's
+        self.pool_fee = 20 # in euro's
+        self.aantal_gebruiker = 10000
+        self.aantal_speculators = 2000
+        self.iterations = 365
         self.groeiratio_gebruiker = 1 / 100  # Omdat de input is in percentages
         self.groeiratio_speculators = 1 / 100  # Omdat de input is in percentages
         self.ratio_op_de_markt_investeerders = 0 # Omdat de input is in percentages
         self.ratio_op_de_markt_systemen = 0.5 / 100 # Omdat de input is in percentages
         self.tge_psa = 100
+        self.elasticiteit = 0.5
 
 class Token:
     '''
     De token klasse die alle eigenschappen van de tokens bijhoudt
     '''
     # Attributen
-    def __init__(self, token_supply, initial_token_price, elasticiteit = 0.1):
+    def __init__(self, token_supply, initial_token_price, elasticiteit):
         self.__totale_supply = token_supply
         self.__circulerende_supply = 0
         self.__prijs = initial_token_price
@@ -51,8 +52,12 @@ class Token:
         
     def bereken_prijs(self, vraag, aanbod):
         if aanbod > 0:
-            nieuwe_prijs_factor = (self.__elasticiteit*(vraag/aanbod)) + 1
-            self.__prijs *= nieuwe_prijs_factor
+            if vraag >= aanbod:
+                nieuwe_prijs_factor = 1 + (self.__elasticiteit*(vraag/aanbod)) 
+                self.__prijs *= nieuwe_prijs_factor
+            elif aanbod > vraag:
+                nieuwe_prijs_factor = 1 - (self.__elasticiteit*(vraag/aanbod)) 
+                self.__prijs *= nieuwe_prijs_factor               
         else:
             # Als er geen aanbod is, blijft de prijs hetzelfde om deling door nul te voorkomen
             pass
@@ -99,11 +104,11 @@ class Gebruiker(User):
     def __init__(self, id, cash, data_utility, random_factor = None):
         super().__init__(id, cash)
         self.data_utility = data_utility
-        self.random_factor = random_factor if random_factor is not None else random.uniform(1, 3)
+        self.random_factor = random_factor if random_factor is not None else random.uniform(1, 5)
         self.days_until_available = 0
         
-    def aciviteit_utility(self, token):    
-        value = 1 + 2 * self.tokens + 1 * self.cash + (self.tokens * token.get_prijs())  # Prijs heeft een lichte invloed
+    def activiteit_utility(self, token):    
+        value = 1 + 3 * self.tokens + 1 * self.cash + (self.tokens * token.get_prijs())  # Prijs heeft een lichte invloed
             
         # Controleer op negatieve waarde (log mag niet negatief zijn)
         if value <= 0:
@@ -154,23 +159,27 @@ class Speculator(User):
         koop_utility = self.koop_utility(token)
         verkoop_utility = self.verkoop_utility(token)
 
+        # Bepaal een willekeurige factor tussen 0 en 0.05
+        random_factor = random.uniform(0, 0.05)
+
         max_cash = 5000  # Maximale hoeveelheid cash om te handelen
         token_prijs = token.get_prijs()
-        if token_prijs == 0:
+        
+        if token_prijs == 0 or random_factor == 0:
             return 0  # Vermijd deling door nul
 
         if koop_utility > verkoop_utility:
             # Bepaal het aantal tokens om te kopen met maximaal 5% van de cash
-            max_cash = self.cash * 0.05
-            max_tokens = max_cash / token_prijs
-            return min(max_tokens, self.cash / token_prijs)
+            max_cash = self.cash * random_factor
+            max_tokens = int(max_cash / token_prijs)
+            return min(max_tokens, int(self.cash / token_prijs))
         elif koop_utility < verkoop_utility:
             # Bepaal het aantal tokens om te verkopen met maximaal 5% van de tokens
-            max_tokens = self.tokens * 0.05
-            return min(max_tokens, self.tokens)
+            max_tokens = int(self.tokens * random_factor)
+            return min(max_tokens, int(self.tokens))
         else:
             return 0
-    
+
 class InvestorGroup:
     def __init__(self, totale_supply, allocatie_percentage, tge_percentage, vesting_maanden, verkoop_threshold = None):
         self.totale_allocatie = totale_supply * (allocatie_percentage / 100)
@@ -302,10 +311,12 @@ class Brand:
         exchange.koop_tokens(self, aantal_tokens, liquidity)
 
     def betaal_pool_fee(self, token, hb, pool_fee):
-        if self.tokens >= pool_fee:
-            self.tokens -= pool_fee
-            hb.ontvang_setup_fee(token, pool_fee)
-            print(f"Brand heeft de pool fee van {pool_fee} tokens betaald aan HB.")
+        pool_fee_tokens = pool_fee / token.get_prijs()
+        
+        if self.tokens >= pool_fee_tokens:
+            self.tokens -= pool_fee_tokens
+            hb.ontvang_setup_fee(token, pool_fee_tokens)
+            print(f"Brand heeft de pool fee van {pool_fee_tokens} tokens betaald aan HB.")
         else:
             print("Brand heeft niet genoeg tokens om de pool fee te betalen.")
             return False
@@ -325,10 +336,12 @@ class DataPartner:
         exchange.koop_tokens(self, aantal_tokens, liquidity)
 
     def betaal_setup_fee(self, token, hb, setup_fee):
-        if self.tokens >= setup_fee:
-            self.tokens -= setup_fee
-            hb.ontvang_setup_fee(token, setup_fee)
-            print(f"Data Partner heeft de setup_fee van {setup_fee} tokens betaald aan HB.")
+        setup_fee_tokens = setup_fee / token.get_prijs()
+        
+        if self.tokens >= setup_fee_tokens:
+            self.tokens -= setup_fee_tokens
+            hb.ontvang_setup_fee(token, setup_fee_tokens)
+            print(f"Data Partner heeft de setup_fee van {setup_fee_tokens} tokens betaald aan HB.")
         else:
             print("Data Partner heeft niet genoeg tokens om de setup_fee te betalen.")
             return False
@@ -365,9 +378,7 @@ class HB: # Beheerder van de token
             self.cash += bedrag
 
 class Activiteiten:
-    def __init__(self, inleg, beloning, probability, activity_threshold):
-        self.inleg = inleg
-        self.beloning = beloning
+    def __init__(self, probability, activity_threshold):
         self.probability = probability
         self.activity_threshold = activity_threshold
 
@@ -389,11 +400,10 @@ class Activiteiten:
         return True
 
 class StandaardActiviteit(Activiteiten):
-    def __init__(self, inleg, beloning, probability, activity_threshold):
-        super().__init__(inleg, beloning, probability, activity_threshold)
+    def __init__(self, probability, activity_threshold):
+        super().__init__(probability, activity_threshold)
 
     def deelname_activiteit(self, token, exchange, gebruiker, hb):
-
         # Controleren of de gebruiker beschikbaar is voor een activiteit        
         if not self.check_en_update_beschikbaarheid(gebruiker):
             return
@@ -402,36 +412,41 @@ class StandaardActiviteit(Activiteiten):
         threshold = self.bereken_threshold(exchange)
 
         # Controleer of de utility van de gebruiker hoger is dan de threshold
-        if gebruiker.aciviteit_utility(token) > threshold:
+        if gebruiker.activiteit_utility(token) > threshold:
             print("Gebruiker doet mee met de standaard activiteit")
             # Controleer of de gebruiker wint op basis van probability
+
+            # Bereken een willekeurige inleg tussen de 5 en 10 euro
+            inleg_cash = random.uniform(5, 10)
+            inleg_tokens = inleg_cash / token.get_prijs() # Bereken het aantal tokens dat ingelegd moet worden op basis van cash
             
             # Bereken 1% van de inleg als fee voor HB
-            fee_voor_hb = self.inleg * 0.01
+            fee_voor_hb = inleg_tokens * 0.01
             hb.tokens += fee_voor_hb            
             
             # Check nog of gebruiker genoeg tokens heeft, anders kopen
-            if gebruiker.tokens < self.inleg:
+            if gebruiker.tokens < inleg_tokens:
                 print("Gebruiker heeft niet genoeg geld om aan de activiteit te deelnemen, dus koopt extra tokens")
-                missende_tokens = (self.inleg - gebruiker.tokens)
+                missende_tokens = (inleg_tokens - gebruiker.tokens)
                 gebruiker.koop_tokens(exchange, missende_tokens)
     
             # Met een bepaalde kans krijgen de deelnemers tokens na hun inleg
             if random.random() < self.probability:
-                gebruiker.tokens += (self.beloning - self.inleg)
-                print("Gebruiker wint")
+                beloning_tokens = 1.5 * inleg_tokens
+                gebruiker.tokens += (beloning_tokens - inleg_tokens)
+                print(f"Gebruiker wint {beloning_tokens}")
             else: 
-                gebruiker.tokens -= self.inleg
-                hb.tokens += self.inleg * 0.9 # 90% procent van de inleg gaat naar HB als de deelnemer faalt
-                hb.burn_tokens(token, self.inleg*0.1) # 10% van de inleg wordt geburned
-                print("Gebruiker verliest")
+                gebruiker.tokens -= inleg_tokens
+                hb.tokens += inleg_tokens * 0.9 # 90% procent van de inleg gaat naar HB als de deelnemer faalt
+                hb.burn_tokens(token, inleg_tokens*0.1) # 10% van de inleg wordt geburned
+                print(f"Gebruiker verliest {inleg_tokens}")
             
         else:
             print(f"{gebruiker.id} heeft niet genoeg utility om deel te nemen aan deze activiteit.")
      
 class BurningActiviteit(Activiteiten):
-    def __init__(self, inleg, beloning, probability, activity_threshold):
-        super().__init__(inleg, 0, probability, activity_threshold)
+    def __init__(self, probability, activity_threshold):
+        super().__init__(probability, activity_threshold)
         
     def deelname_activiteit(self, token, exchange, gebruiker, ecosystem):
         
@@ -441,32 +456,36 @@ class BurningActiviteit(Activiteiten):
         
         # Gebruik de dynamisch berekende drempelwaarde
         threshold = self.bereken_threshold(exchange)
+
+        # Bereken een willekeurige inleg tussen de 5 en 10 euro
+        inleg_cash = random.uniform(5, 10)
+        inleg_tokens = inleg_cash / token.get_prijs() # Bereken het aantal tokens dat ingelegd moet worden op basis van cash
         
         # Controleer of de utility van de gebruiker hoger is dan de threshold
-        if gebruiker.aciviteit_utility(token) > threshold:
+        if gebruiker.activiteit_utility(token) > threshold:
             print("Gebruiker doet mee met de burning activiteit")
             
             # check nog of gebruiker genoeg tokens heeft, anders kopen
-            if gebruiker.tokens < self.inleg:
+            if gebruiker.tokens < inleg_tokens:
                 print("Gebruiker heeft niet genoeg geld om aan de activiteit te deelnemen, dus koopt extra tokens")
-                missende_tokens = (self.inleg - gebruiker.tokens)
+                missende_tokens = (inleg_tokens - gebruiker.tokens)
                 gebruiker.koop_tokens(exchange, missende_tokens)
                 
             if random.random() < self.probability:
-                gebruiker.tokens -= self.inleg
-                token.burn_tokens(self.inleg)
-                print("Gebruiker wint, en de tokens worden geburnt")
+                gebruiker.tokens -= inleg_tokens
+                token.burn_tokens(inleg_tokens)
+                print(f"Gebruiker wint, en {inleg_tokens} tokens worden geburnt")
             else: 
-                gebruiker.tokens -= self.inleg
-                ecosystem.ontvang_burn_tokens(self.inleg)
-                print("Gebruiker verliest, en de tokens worden naar het ecosystem gestuurd")
+                gebruiker.tokens -= inleg_tokens
+                ecosystem.ontvang_burn_tokens(inleg_tokens)
+                print(f"Gebruiker verliest, en {inleg_tokens} tokens worden naar het ecosystem gestuurd")
         
         else:
             print(f"{gebruiker.id} heeft niet genoeg utility om deel te nemen aan deze activiteit.")   
 
 class MiningActiviteit(Activiteiten):
-    def __init__(self, inleg, beloning, probability, activity_threshold):
-        super().__init__(inleg, 0, probability, activity_threshold)
+    def __init__(self, probability, activity_threshold):
+        super().__init__(probability, activity_threshold)
         
     def deelname_activiteit(self, token, exchange, gebruiker, mining):
 
@@ -476,40 +495,46 @@ class MiningActiviteit(Activiteiten):
 
         # Gebruik de dynamisch berekende drempelwaarde
         threshold = self.bereken_threshold(exchange)
+ 
+        # Bereken een willekeurige inleg tussen de 5 en 10 euro
+        inleg_cash = random.uniform(5, 10)
+        inleg_tokens = inleg_cash / token.get_prijs() # Bereken het aantal tokens dat ingelegd moet worden op basis van cash
         
         # Controleer of de utility van de gebruiker hoger is dan de threshold
-        if gebruiker.aciviteit_utility(token) > threshold:
+        if gebruiker.activiteit_utility(token) > threshold:
             print("Gebruiker doet mee met de mining activiteit")
             # Controleer of de gebruiker wint op basis van probability
             
             # check nog of gebruiker genoeg tokens heeft, anders kopen
-            if gebruiker.tokens < self.inleg:
+            if gebruiker.tokens < inleg_tokens:
                 print("Gebruiker heeft niet genoeg geld om aan de activiteit te deelnemen, dus koopt extra tokens")
-                missende_tokens = (self.inleg - gebruiker.tokens)
+                missende_tokens = (inleg_tokens - gebruiker.tokens)
                 gebruiker.koop_tokens(exchange, missende_tokens)
                 
             if random.random() < self.probability:
-                gebruiker.tokens -= self.inleg
-                token.burn_tokens(self.inleg)
-                print("Gebruiker wint, en de tokens worden geburnt")
+                gebruiker.tokens -= inleg_tokens
+                token.burn_tokens(inleg_tokens)
+                print(f"Gebruiker wint, en {inleg_tokens} tokens worden geburnt")
             else: 
-                gebruiker.tokens -= self.inleg
-                mining.ontvang_mining_tokens(self.inleg)
-                print("Gebruiker verliest, en de tokens worden naar de mining gestuurd")
+                gebruiker.tokens -= inleg_tokens
+                mining.ontvang_mining_tokens(inleg_tokens)
+                print(f"Gebruiker verliest, en {inleg_tokens} tokens worden naar de mining gestuurd")
         
         else:
             print(f"{gebruiker.id} heeft niet genoeg utility om deel te nemen aan deze activiteit.")   
 
 class HostActiviteit(Activiteiten):
-    def __init__(self, beloning, probability, activity_threshold, pool_fee):
-        super().__init__(inleg=0, beloning=beloning, probability=probability, activity_threshold=activity_threshold)
+    def __init__(self, probability, activity_threshold, pool_fee):
+        super().__init__(probability=probability, activity_threshold=activity_threshold)
         self.pool_fee = pool_fee
 
     def setup_activiteit(self, brand, token, hb, exchange):
+        pool_fee_tokens = self.pool_fee / token.get_prijs()
+        
         # De brand moet eerst de pool fee betalen
-        if brand.tokens < self.pool_fee:
+        if brand.tokens < pool_fee_tokens:
             # Brand moet tokens kopen van de exchange om de pool fee te kunnen betalen
-            missende_pool_fee_tokens = self.pool_fee - brand.tokens
+            missende_pool_fee_tokens = pool_fee_tokens - brand.tokens
             brand.koop_tokens(exchange, missende_pool_fee_tokens)
             
         # Als de brand genoeg tokens heeft, betaalt het de pool fee aan HB
@@ -522,23 +547,25 @@ class HostActiviteit(Activiteiten):
             return            
         
         # Gebruik de dynamisch berekende drempelwaarde
-        threshold = 5 * self.bereken_threshold(exchange) # multiply factor van 5 omdat we verwachten dat host activiteiten minder snel gedaan worden
+        threshold = 3 * self.bereken_threshold(exchange) # multiply factor van 3 omdat we verwachten dat host activiteiten minder snel gedaan worden
+        pool_fee_tokens = self.pool_fee / token.get_prijs()
+        beloning = pool_fee_tokens * 0.1 # 5% van de pool_fee kan een gebruiker krijgen
         
-        if gebruiker.aciviteit_utility(token) > threshold:
+        if gebruiker.activiteit_utility(token) > threshold:
             print("Gebruiker doet mee met de host activiteit")
             
             # Controleer of de Brand genoeg tokens heeft om de beloning uit te keren, anders kopen op de markt
-            if brand.tokens < self.beloning:
+            if brand.tokens < beloning:
                 # Brand moet tokens kopen van de exchange om de pool fee te kunnen betalen
-                missende_beloning_tokens = self.beloning - brand.tokens
+                missende_beloning_tokens = beloning - brand.tokens
                 brand.koop_tokens(exchange, missende_beloning_tokens)
             
-            if brand.tokens >= self.beloning:
+            if brand.tokens >= beloning:
                 # Controleer of de gebruiker wint op basis van probability
                 if random.random() < self.probability:
-                    gebruiker.tokens += self.beloning
-                    brand.tokens -= self.beloning
-                    print("Gebruiker wint en ontvangt tokens van de Brand.")
+                    gebruiker.tokens += beloning
+                    brand.tokens -= beloning
+                    print(f"Gebruiker wint en ontvangt {beloning} tokens van de Brand.")
                 else:
                     print("Gebruiker verliest, geen tokens uitbetaald.")
             else:
@@ -548,16 +575,18 @@ class HostActiviteit(Activiteiten):
             print(f"{gebruiker.id} heeft niet genoeg utility om deel te nemen aan deze activiteit.")
   
 class DataPool(Activiteiten):
-     def __init__(self, beloning, probability, data_threshold, setup_fee):
-         super().__init__(inleg=0, beloning=beloning, probability=probability, activity_threshold=data_threshold)
+     def __init__(self, probability, data_threshold, setup_fee):
+         super().__init__(probability=probability, activity_threshold=data_threshold)
          self.setup_fee = setup_fee
          self.data_threshold = data_threshold
     
      def setup_activiteit(self, datapartner, token, hb, exchange):
+         setup_fee_tokens = self.setup_fee / token.get_prijs()
+         
          # De Data Partner moet eerst de setup fee betalen
-         if datapartner.tokens < self.setup_fee:
+         if datapartner.tokens < setup_fee_tokens:
              # Data Partner moet tokens kopen van de exchange om de setup fee te kunnen betalen
-             missende_setup_fee_tokens = self.setup_fee - datapartner.tokens
+             missende_setup_fee_tokens = setup_fee_tokens - datapartner.tokens
              datapartner.koop_tokens(exchange, missende_setup_fee_tokens)
              
          # Als de data partner genoeg tokens heeft, betaalt het de setup fee aan HB
@@ -571,28 +600,29 @@ class DataPool(Activiteiten):
          
          # Gebruik de dynamisch berekende drempelwaarde
          threshold = self.bereken_threshold(exchange)
+         setup_fee_tokens = self.setup_fee / token.get_prijs()
+         beloning = setup_fee_tokens * 0.05 # 5% van de setup_fee kan een gebruiker krijgen
          
          if gebruiker.data_utility > threshold:
              print("Gebruiker doet mee met de data activiteit")
              
              # Controleer of de Datapartner genoeg tokens heeft om de beloning uit te keren, anders kopen op de markt
-             if datapartner.tokens < self.beloning:
+             if datapartner.tokens < beloning:
                  # Data Partner moet tokens kopen van de exchange om de beloning te kunnen uitkeren
-                 missende_beloning_tokens = self.beloning - datapartner.tokens
+                 missende_beloning_tokens = beloning - datapartner.tokens
                  datapartner.koop_tokens(exchange, missende_beloning_tokens)
              
-             if datapartner.tokens >= self.beloning:
+             if datapartner.tokens >= beloning:
                  # Controleer of de gebruiker wint op basis van probability
                  if random.random() < self.probability:
-                     gebruiker.tokens += self.beloning
-                     datapartner.tokens -= self.beloning
-                     print("Gebruiker wint en ontvangt tokens van de Data Partner.")
+                     gebruiker.tokens += beloning
+                     datapartner.tokens -= beloning
+                     print(f"Gebruiker wint en ontvangt {beloning} tokens van de Data Partner.")
                  else:
                      print("Gebruiker verliest, geen tokens uitbetaald.")
              else:
                  print("Data Partner heeft niet genoeg tokens om de beloning uit te keren.")
-    
-           
+               
          else:
              print(f"{gebruiker.id} heeft niet genoeg utility om deel te nemen aan deze activiteit.")     
   
@@ -698,7 +728,7 @@ class Exchange:
 def run_simulatie():
     # Configuratie instellen
     config = Configuratie()
-    token = Token(config.total_supply, config.initial_token_price)
+    token = Token(config.total_supply, config.initial_token_price, elasticiteit=config.elasticiteit)
     liquidity = Liquidity(config.total_supply)
     exchange = Exchange(token=token, liquidity=liquidity)
 
@@ -717,12 +747,12 @@ def run_simulatie():
     Bra = Brand(config.initial_cash_brands)
 
     # Initialiseer de activiteiten
-    StandaardActiviteit1 = StandaardActiviteit(inleg=1000, beloning=1500, probability=0.9, activity_threshold=5)
-    BurningActiviteit1 = BurningActiviteit(inleg=1000, beloning=1500, probability=0.9, activity_threshold=5)
-    MiningActiviteit1 = MiningActiviteit(inleg=1000, beloning=1500, probability=0.9, activity_threshold=5)
+    StandaardActiviteit1 = StandaardActiviteit(probability=0.9, activity_threshold=10)
+    BurningActiviteit1 = BurningActiviteit(probability=0.9, activity_threshold=12)
+    MiningActiviteit1 = MiningActiviteit(probability=0.9, activity_threshold=14)
 
-    DataPool1 = DataPool(beloning=5000, probability=1, data_threshold=50, setup_fee=config.setup_fee)
-    HostActiviteit1 = HostActiviteit(beloning=2000, probability=0.8, activity_threshold=10, pool_fee=config.pool_fee)
+    DataPool1 = DataPool(probability=1, data_threshold=30, setup_fee=config.setup_fee)
+    HostActiviteit1 = HostActiviteit(probability=0.8, activity_threshold=20, pool_fee=config.pool_fee)
 
     activiteiten = [StandaardActiviteit1, BurningActiviteit1, MiningActiviteit1, DataPool1, HostActiviteit1]
 
@@ -767,6 +797,21 @@ def run_simulatie():
         "Datapool": [],
         "Sponsored": []
     }
+
+    # Lijst voor beschikbare tokens van de liquidity klasse per iteratie
+    liquidity_tokens_over_time = []
+    
+    # Lijst voor de marktprijs over tijd
+    marktprijs_over_time = []
+    
+    # Dictionary om het aantal tokens per klasse op de markt bij te houden
+    tokens_op_markt_per_klasse = {
+        "FriendsAndFamily": [],
+        "TeamAndAdvisors": [],
+        "PublicSaleAirdrop": [],
+        "Mining": [],
+        "Ecosystem": []
+    }
     
     # Lijsten om utilities van gebruikers en speculators bij te houden
     gebruiker_utilities = []
@@ -800,16 +845,17 @@ def run_simulatie():
         exchange.voeg_tokens_toe(Eco, Eco.beschikbare_vrijgegeven_tokens * config.ratio_op_de_markt_systemen, token)
     
         # Groeimodel voor gebruikers
-        nieuw_aantal_gebruikers = int(len(gebruikers) * (1 + config.groeiratio_gebruiker))
-        extra_gebruikers = nieuw_aantal_gebruikers - len(gebruikers)
-    
-        # Voeg nieuwe gebruikers toe
-        for i in range(extra_gebruikers):
-            gebruiker = Gebruiker(id, cash=config.initial_cash_user, data_utility=75)
-            gebruikers.append(gebruiker)
+        if iteratie % 30 == 0:
+            nieuw_aantal_gebruikers = int(len(gebruikers) * (1 + config.groeiratio_gebruiker))
+            extra_gebruikers = nieuw_aantal_gebruikers - len(gebruikers)
+        
+            # Voeg nieuwe gebruikers toe
+            for i in range(extra_gebruikers):
+                gebruiker = Gebruiker(id, cash=config.initial_cash_user, data_utility=75)
+                gebruikers.append(gebruiker)
     
         # Utilities van gebruikers bijhouden
-        gebruiker_utilities_iteratie = [gebruiker.aciviteit_utility(token) for gebruiker in gebruikers]
+        gebruiker_utilities_iteratie = [gebruiker.activiteit_utility(token) for gebruiker in gebruikers]
         gebruiker_utilities.append(sum(gebruiker_utilities_iteratie) / len(gebruikers))  # Gemiddelde utility van alle gebruikers
     
         # Utilities van speculators bijhouden
@@ -833,10 +879,8 @@ def run_simulatie():
             elif isinstance(activiteit, MiningActiviteit):
                 activiteit.deelname_activiteit(token, exchange, gebruiker, Min)
             elif isinstance(activiteit, DataPool):
-                activiteit.setup_activiteit(DP, token, hb, exchange)
                 activiteit.deelname_activiteit(token, exchange, gebruiker, DP)
             elif isinstance(activiteit, HostActiviteit):
-                activiteit.setup_activiteit(Bra, token, hb, exchange)
                 activiteit.deelname_activiteit(token, exchange, gebruiker, Bra)
         
             # Update de beschikbaarheid van de gebruiker voor de volgende activiteit
@@ -851,13 +895,14 @@ def run_simulatie():
         activiteiten_utilities["Sponsored"].append(activiteiten[4].bereken_threshold(exchange))
     
         # Groeimodel voor speculators
-        nieuw_aantal_speculators = int(len(specs) * (1 + config.groeiratio_speculators))
-        extra_speculators = nieuw_aantal_speculators - len(specs)
-    
-        # Voeg nieuwe speculators toe
-        for i in range(extra_speculators):
-            spec = Speculator(id, cash=config.initial_cash_speculator)
-            specs.append(spec)        
+        if iteratie % 30 == 0:
+            nieuw_aantal_speculators = int(len(specs) * (1 + config.groeiratio_speculators))
+            extra_speculators = nieuw_aantal_speculators - len(specs)
+        
+            # Voeg nieuwe speculators toe
+            for i in range(extra_speculators):
+                spec = Speculator(id, cash=config.initial_cash_speculator)
+                specs.append(spec)        
     
         # Laat speculators handelen
         for spec in specs:
@@ -870,6 +915,20 @@ def run_simulatie():
         # Update de marktprijs
         exchange.update_marktprijs()
 
+        # Houd de beschikbare tokens van de liquidity klasse bij
+        liquidity_tokens_over_time.append(liquidity.beschikbare_vrijgegeven_tokens)
+        
+        # Houd de marktprijs per iteratie bij
+        marktprijs_over_time.append(token.get_prijs())
+        
+        # Houd het aantal tokens op de markt per klasse bij
+        tokens_op_markt_per_klasse["FriendsAndFamily"].append(FaF.tokens_op_markt)
+        tokens_op_markt_per_klasse["TeamAndAdvisors"].append(TaA.tokens_op_markt)
+        tokens_op_markt_per_klasse["PublicSaleAirdrop"].append(PSA.tokens_op_markt)
+        tokens_op_markt_per_klasse["Mining"].append(Min.tokens_op_markt)
+        tokens_op_markt_per_klasse["Ecosystem"].append(Eco.tokens_op_markt)
+
+
     # Plot en print statements
     print("Simulatie voltooid!")
     print(f"Finale Marktprijs: {token.get_prijs()}")
@@ -877,6 +936,35 @@ def run_simulatie():
     print(f"Totaal aantal tokens op de markt: {exchange.tokens_op_markt}")
     print(f"Totaal aantal geburnde tokens: {hb.totale_burned_tokens}")
     print(f"Totaal aantal tokens HB: {hb.tokens}") 
+
+
+    # Plot de beschikbare tokens van de Liquidity klasse over tijd
+    plt.plot(liquidity_tokens_over_time, label="Beschikbare Tokens - Liquidity", color='blue')
+    plt.xlabel("Iteraties")
+    plt.ylabel("Beschikbare Tokens")
+    plt.title("Beschikbare Tokens van de Liquidity Klasse over Tijd")
+    plt.legend()
+    plt.show()
+    
+    # Plot de marktprijs van de token over tijd
+    plt.plot(marktprijs_over_time, label="Marktprijs", color='green')
+    plt.xlabel("Iteraties")
+    plt.ylabel("Prijs (in Euro's)")
+    plt.title("Marktprijs van de Token over Tijd")
+    plt.legend()
+    plt.show()
+    
+    # Plot het aantal tokens op de markt per klasse over tijd
+    plt.plot(tokens_op_markt_per_klasse["FriendsAndFamily"], label="FriendsAndFamily", color='orange')
+    plt.plot(tokens_op_markt_per_klasse["TeamAndAdvisors"], label="TeamAndAdvisors", color='red')
+    plt.plot(tokens_op_markt_per_klasse["PublicSaleAirdrop"], label="PublicSaleAirdrop", color='purple')
+    plt.plot(tokens_op_markt_per_klasse["Mining"], label="Mining", color='brown')
+    plt.plot(tokens_op_markt_per_klasse["Ecosystem"], label="Ecosystem", color='cyan')
+    plt.xlabel("Iteraties")
+    plt.ylabel("Tokens op de Markt")
+    plt.title("Tokens op de Markt per Klasse over Tijd")
+    plt.legend()
+    plt.show()
 
     plt.plot(FaF.vrijgave_per_iteratie, label="FriendsAndFamily")
     plt.plot(TaA.vrijgave_per_iteratie, label="TeamAndAdvisors")
@@ -914,161 +1002,3 @@ def run_simulatie():
     plt.show()
     
 run_simulatie()    
-
-'''
-TEST
-
-
-config = Configuratie()
-token = Token(config.total_supply, config.initial_token_price)
-liquidity = Liquidity(config.total_supply)
-exchange = Exchange(token=token, liquidity=liquidity)
-
-hb = HB()
-
-FaF = FriendsAndFamily(config.total_supply)
-TaA = TeamAndAdvisors(config.total_supply)
-PSA = PublicSaleAirdrop(config.total_supply)
-Min = Mining(config.total_supply)
-Eco = Ecosystem(config.total_supply)
-
-DP = DataPartner(config.initial_cash_datapartner)
-Bra = Brand(config.initial_cash_brands)
-
-StandaardActiviteit1 = StandaardActiviteit(inleg=1000, beloning=1500, probability=0.9, activity_threshold=5)
-BurningActiviteit1 = BurningActiviteit(inleg=1000, beloning=1500, probability=0.9, activity_threshold=5)
-MiningActiviteit1 = MiningActiviteit(inleg=1000, beloning=1500, probability=0.9, activity_threshold=5)
-
-DataPool1 = DataPool(beloning=5000, probability=1, data_threshold=50, setup_fee=config.setup_fee)
-HostActiviteit1 = HostActiviteit(beloning=2000, probability=0.8, activity_threshold=10, pool_fee=config.pool_fee)
-
-activiteiten = [StandaardActiviteit1, BurningActiviteit1, MiningActiviteit1, DataPool1, HostActiviteit1]
-
-StandaardActiviteit1.activity_threshold
-
-gebruikers = []
-aantal_gebruiker = config.aantal_gebruiker
-
-for i in range(aantal_gebruiker):
-    gebruiker = Gebruiker(id, cash=config.initial_cash_user, data_utility=75)
-    gebruikers.append(gebruiker)
-
-specs = []
-aantal_spec = config.aantal_speculators
-
-for i in range(aantal_spec):
-    spec = Speculator(id, cash=config.initial_cash_speculator)
-    specs.append(spec)
-
-iteratie = 0
-
-FaF.vrijgave_tokens(iteratie)
-TaA.vrijgave_tokens(iteratie)
-PSA.vrijgave_tokens(iteratie)
-Min.vrijgave_tokens(iteratie)
-Eco.vrijgave_tokens(iteratie)
-liquidity.vrijgave_tokens(iteratie)
-
-# Dictionary om vrijgave van tokens bij te houden per iteratie voor elke groep
-vrijgave_per_iteratie = {
-    "FriendsAndFamily": [],
-    "TeamAndAdvisors": [],
-    "PublicSaleAirdrop": [],
-    "Mining": [],
-    "Ecosystem": [],
-    "Liquidity": []
-}
-
-activiteiten_utilities = {
-    "Standaard": [],
-    "Burning": [],
-    "Mining": [],
-    "Datapool": [],
-    "Sponsored": []
-}
-
-gebruiker_utilities = []
-speculator_koop_utilities = []
-speculator_verkoop_utilities = []
-
-iterations = config.iterations
-for iteratie in range(iterations):
-    FaF.vrijgave_tokens(iteratie)
-    TaA.vrijgave_tokens(iteratie)
-    PSA.vrijgave_tokens(iteratie)
-    Min.vrijgave_tokens(iteratie)
-    Eco.vrijgave_tokens(iteratie)
-    liquidity.vrijgave_tokens(iteratie)
-
-    # Vrijgave opslaan in dictionary
-    vrijgave_per_iteratie["FriendsAndFamily"].append(FaF.vrijgave_per_iteratie[-1])
-    vrijgave_per_iteratie["TeamAndAdvisors"].append(TaA.vrijgave_per_iteratie[-1])
-    vrijgave_per_iteratie["PublicSaleAirdrop"].append(PSA.vrijgave_per_iteratie[-1])
-    vrijgave_per_iteratie["Mining"].append(Min.vrijgave_per_iteratie[-1])
-    vrijgave_per_iteratie["Ecosystem"].append(Eco.vrijgave_per_iteratie[-1])
-    vrijgave_per_iteratie["Liquidity"].append(liquidity.vrijgave_per_iteratie[-1])
-
-    exchange.voeg_tokens_toe(PSA, PSA.beschikbare_vrijgegeven_tokens, token)
-    exchange.voeg_tokens_toe(FaF, FaF.beschikbare_vrijgegeven_tokens * 0.01, token)
-    exchange.voeg_tokens_toe(TaA, TaA.beschikbare_vrijgegeven_tokens * 0.01, token)
-    exchange.voeg_tokens_toe(Min, Min.beschikbare_vrijgegeven_tokens * 0.005, token)
-    exchange.voeg_tokens_toe(Eco, Eco.beschikbare_vrijgegeven_tokens * 0.005, token)
-
-    # Groeimodel voor gebruikers
-    nieuw_aantal_gebruikers = int(len(gebruikers) * (1 + config.groeiratio_gebruiker ))
-    extra_gebruikers = nieuw_aantal_gebruikers - len(gebruikers)
-
-    #st.write(f"Iteratie {iteratie + 1}: Aantal gebruikers is gegroeid naar {len(gebruikers)}")
-
-    for i in range(extra_gebruikers):
-        gebruiker = Gebruiker(id, cash=config.initial_cash_user, data_utility=75)
-        gebruikers.append(gebruiker)
-
-    # Utilities bijhouden
-    gebruiker_utilities_iteratie = [gebruiker.aciviteit_utility(token) for gebruiker in gebruikers]
-    gebruiker_utilities.append(sum(gebruiker_utilities_iteratie) / len(gebruikers))  # Gemiddelde utility van alle gebruikers
-
-    speculator_koop_utilities_iteratie = [spec.koop_utility(token) for spec in specs]
-    speculator_verkoop_utilities_iteratie = [spec.verkoop_utility(token) for spec in specs]
-
-    speculator_koop_utilities.append(sum(speculator_koop_utilities_iteratie) / len(specs))  # Gemiddelde koop utility van alle speculators
-    speculator_verkoop_utilities.append(sum(speculator_verkoop_utilities_iteratie) / len(specs))  # Gemiddelde verkoop utility van alle speculators
-
-    for gebruiker in gebruikers:
-        activiteit = random.choice(activiteiten)
-        if isinstance(activiteit, StandaardActiviteit):
-            activiteit.deelname_activiteit(token, exchange, gebruiker, hb)
-        elif isinstance(activiteit, BurningActiviteit):
-            activiteit.deelname_activiteit(token, exchange, gebruiker, Eco)
-        elif isinstance(activiteit, MiningActiviteit):
-            activiteit.deelname_activiteit(token, exchange, gebruiker, Min)
-        elif isinstance(activiteit, DataPool):
-            activiteit.setup_activiteit(DP, token, hb, exchange)
-            activiteit.deelname_activiteit(token, exchange, gebruiker, DP)
-        elif isinstance(activiteit, HostActiviteit):
-            activiteit.setup_activiteit(Bra, token, hb, exchange)
-            activiteit.deelname_activiteit(token, exchange, gebruiker, Bra)
-
-    activiteiten_utilities["Standaard"].append(activiteiten[0].bereken_threshold(exchange))
-    activiteiten_utilities["Burning"].append(activiteiten[1].bereken_threshold(exchange))
-    activiteiten_utilities["Mining"].append(activiteiten[2].bereken_threshold(exchange))
-    activiteiten_utilities["Datapool"].append(activiteiten[3].bereken_threshold(exchange))
-    activiteiten_utilities["Sponsored"].append(activiteiten[4].bereken_threshold(exchange))
-
-    # Groeimodel voor speculators
-    nieuw_aantal_speculators = int(len(specs) * (1 + config.groeiratio_speculators ))
-    extra_speculators = nieuw_aantal_speculators - len(specs)
-
-    for i in range(extra_speculators):
-        spec = Speculator(id, cash=config.initial_cash_speculator)
-        specs.append(spec)        
-
-    for spec in specs:
-        handelbare_tokens = spec.bepaal_aantal_tokens_om_te_handelen(token)
-        if spec.koop_utility(token) > spec.verkoop_utility(token):
-            spec.koop_tokens(exchange, handelbare_tokens)
-        elif spec.verkoop_utility(token) > spec.koop_utility(token):
-            spec.verkoop_tokens(exchange, handelbare_tokens)
-
-    exchange.update_marktprijs()
-'''
